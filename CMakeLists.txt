@@ -12,4 +12,15 @@ add_executable(raytracer main.cpp
         hittable_list.h
         rtweekend.h
         interval.h
-        camera.h)
+        camera.h
+        material.h
+        quad.h
+        triangle.h
+        objects.h
+        texture.h)
+
+include_directories(/usr/local/include)
+
+find_package(SFML 2.6 COMPONENTS system window graphics network audio REQUIRED)
+include_directories(${SFML_INCLUDE_DIRS})
+target_link_libraries(raytracer sfml-system sfml-window sfml-graphics sfml-audio sfml-network)

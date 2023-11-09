@@ -1,4 +1,4 @@
-# Install script for directory: /Users/andre/CLionProjects/LabCourseGraphics/raytracer
+# Install script for directory: /Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/Users/andre/CLionProjects/LabCourseGraphics/raytracer/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

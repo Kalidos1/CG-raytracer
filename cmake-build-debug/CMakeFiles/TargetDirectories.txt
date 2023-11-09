@@ -1,3 +1,3 @@
-/Users/andre/CLionProjects/LabCourseGraphics/raytracer/cmake-build-debug/CMakeFiles/raytracer.dir
-/Users/andre/CLionProjects/LabCourseGraphics/raytracer/cmake-build-debug/CMakeFiles/edit_cache.dir
-/Users/andre/CLionProjects/LabCourseGraphics/raytracer/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/cmake-build-debug/CMakeFiles/raytracer.dir
+/Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/cmake-build-debug/CMakeFiles/rebuild_cache.dir
