@@ -1,174 +1,109 @@
-#ifndef RAYTRACER_MATERIAL_H
-#define RAYTRACER_MATERIAL_H
+#ifndef MATERIAL_H
+#define MATERIAL_H
 
-#include "rtweekend.h"
-#include "texture.h"
+#include "color.h"
 
-class hit_record;
-
-class material {
+class Material {
 public:
-    virtual ~material() = default;
+    virtual ~Material() = default;
 
-    virtual color emitted(double u, double v, const point3 &p) const {
-        return color(0, 0, 0);
-    }
-
-    virtual bool scatter(
-            const ray &r_in, const hit_record &rec, color &attenuation, ray &scattered) const = 0;
+    [[nodiscard]] virtual color shade(const color&light_color, const point3&hit_point, const Ray&ray,
+                                      const vec3&light_position, const vec3&normal,
+                                      const color&object_color) const = 0;
 };
 
-class phong : public material {
+class PhongMaterial final : public Material {
 public:
-    phong(const color &a, const vec3 _camera_pos, const color _light_color, const vec3 _light_pos)
-            : albedo(make_shared<solid_color>(a)),
-              camera_pos(_camera_pos),
-              light_color(_light_color),
-              light_pos(_light_pos) {}
-
-    bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &scattered)
-    const override {
-        vec3 diffuse_color = diffuse(rec);
-        vec3 ambient_color = ambient(0.1, rec);
-        vec3 specular_color = specular(0.5, rec);
-
-        auto phong_color = ambient_color + diffuse_color + specular_color;
-
-        auto scatter_direction = rec.normal + random_unit_vector();
-
-        // Catch degenerate scatter direction
-        if (scatter_direction.near_zero())
-            scatter_direction = rec.normal;
-
-        scattered = ray(rec.p, scatter_direction);
-        attenuation = albedo->value(rec.u, rec.v, rec.p);
-        return true;
+    explicit PhongMaterial(const double _shininess) : shininess(_shininess) {
     }
 
-    vec3 diffuse(const hit_record &rec) const {
-        auto light_direction = unit_vector(light_pos - rec.p);
-        auto illumination = light_color * (dot(rec.normal, light_direction));
-        auto reflected_light = rec.p * illumination; // Might be dot product not sure
-        // Also might be the formula with max value so it does not hit below 0
-        return (1 / pi) * reflected_light;
-    }
+    [[nodiscard]] color shade(const color&light_color, const point3&hit_point, const Ray&ray,
+                              const vec3&light_position, const vec3&normal, const color&object_color) const override {
+        // Calculate the normal of the object
+        const vec3 viewer_direction = unit_vector(hit_point - ray.origin);
+        const vec3 light_direction = unit_vector(light_position - hit_point);
+        const color white = color(1, 1, 1);
 
-    vec3 specular(const double shinyness, const hit_record &rec) const {
-        auto view_direction = unit_vector(camera_pos - rec.p);
-        auto light_direction = unit_vector(light_pos - rec.p);
-        auto illumination = light_color * (dot(rec.normal, light_direction));
-        color white = color(255, 255, 255);
-        auto reflected_light = white * illumination;
-        auto reflection_vector = 2 * (light_direction * rec.normal) * rec.normal - light_direction;
-        return reflected_light * pow(dot(reflection_vector, view_direction), shinyness);
-    }
+        //Diffuse
+        const double diffuse_component = std::max(0.0, dot(light_direction, normal));
 
-    vec3 ambient(const double ambient_strength, const hit_record &rec) const {
-        auto object_color = albedo->value(rec.u, rec.v, rec.p);
-        auto ambient = ambient_strength * light_color;
-        return ambient * object_color;
+        //Specular
+        const vec3 reflection_vector = unit_vector(normal * diffuse_component * 2 - light_direction);
+        const double specular_component = std::pow(std::max(dot(viewer_direction, -reflection_vector), 0.0), shininess);
+
+        //Ambient
+        const color ambient_color = object_color * 0.5;
+
+        //Phong Formula
+        const vec3 ambient_reflection = 1 / M_PI * ambient_color;
+        const vec3 surface_illumination = light_color * std::max(0.0, dot(light_direction, normal));
+        const vec3 diffuse_reflection = 1 / M_PI * object_color;
+        const vec3 specular_reflection = white * specular_component;
+
+        // Might be possible to do multiple light sources
+        const vec3 phong_shade = ambient_reflection + surface_illumination * (
+                                     diffuse_reflection + specular_reflection);
+
+        // Calculate the min and max value so that we do not overshoot and get a negative color value
+        // -> Gets black or other color which we do not want to have
+        const double phong_red = std::max(0.0, std::min(phong_shade.x(), 1.0));
+        const double phong_green = std::max(0.0, std::min(phong_shade.y(), 1.0));
+        const double phong_blue = std::max(0.0, std::min(phong_shade.z(), 1.0));
+
+        return {phong_red, phong_green, phong_blue};
     }
 
 private:
-    shared_ptr<texture> albedo;
-    vec3 camera_pos;
-    color light_color;
-    vec3 light_pos;
+    double shininess;
 };
 
-class lambertian : public material {
+class LambertianMaterial final : public Material {
 public:
-    lambertian(const color &a) : albedo(make_shared<solid_color>(a)) {}
+    explicit LambertianMaterial(const vec3&_albedo) : albedo(_albedo) {
+    }
 
-    lambertian(shared_ptr<texture> a) : albedo(a) {}
-
-    bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &scattered)
-    const override {
-        auto scatter_direction = rec.normal + random_unit_vector();
-
-        // Catch degenerate scatter direction
-        if (scatter_direction.near_zero())
-            scatter_direction = rec.normal;
-
-        scattered = ray(rec.p, scatter_direction);
-        attenuation = albedo->value(rec.u, rec.v, rec.p);
-        return true;
+    [[nodiscard]] color shade(const color&light_color, const point3&hit_point, const Ray&ray,
+                              const vec3&light_position, const vec3&normal, const color&object_color) const override {
+        const vec3 light_direction = unit_vector(light_position - hit_point);
+        const double diffuse_component = std::max(0.0, dot(normal, light_direction));
+        return albedo * diffuse_component * object_color;
     }
 
 private:
-    shared_ptr<texture> albedo;
+    vec3 albedo;
 };
 
-class metal : public material {
+class CheckeredMaterial final : public Material {
 public:
-    metal(const color &a, double f) : albedo(a), fuzz(f < 1 ? f : 1) {}
+    explicit CheckeredMaterial(const double _size) : size(_size) {
+    }
 
-    bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &scattered)
-    const override {
-        vec3 reflected = reflect(unit_vector(r_in.direction()), rec.normal);
-        scattered = ray(rec.p, reflected + fuzz * random_unit_vector());
-        attenuation = albedo;
-        return (dot(scattered.direction(), rec.normal) > 0);
+    [[nodiscard]] color shade(const color&light_color, const point3&hit_point, const Ray&ray,
+                              const vec3&light_position, const vec3&normal, const color&object_color) const override {
+        const color white = color(1, 1, 1);
+        const int square_x = static_cast<int>(floor(hit_point.x() / size));
+        const int square_y = static_cast<int>(floor(hit_point.z() / size));
+
+        // Check for modulo 2 which results in this checkered pattern, else return white
+        if ((square_x + square_y) % 2 == 0) return object_color;
+        return white;
     }
 
 private:
-    color albedo;
-    double fuzz;
+    double size;
 };
 
-class dielectric : public material {
+class Mirror final : public Material {
 public:
-    dielectric(double index_of_refraction) : ir(index_of_refraction) {}
+    vec3 albedo;
 
-    bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &scattered)
-    const override {
-        attenuation = color(1.0, 1.0, 1.0);
-        double refraction_ratio = rec.front_face ? (1.0 / ir) : ir;
-
-        vec3 unit_direction = unit_vector(r_in.direction());
-        double cos_theta = fmin(dot(-unit_direction, rec.normal), 1.0);
-        double sin_theta = sqrt(1.0 - cos_theta * cos_theta);
-
-        bool cannot_refract = refraction_ratio * sin_theta > 1.0;
-        vec3 direction;
-
-        if (cannot_refract || reflectance(cos_theta, refraction_ratio) > random_double())
-            direction = reflect(unit_direction, rec.normal);
-        else
-            direction = refract(unit_direction, rec.normal, refraction_ratio);
-
-        scattered = ray(rec.p, direction);
-        return true;
+    explicit Mirror(const vec3&_albedo) : albedo(_albedo) {
     }
 
-private:
-    double ir; // Index of Refraction
-
-    static double reflectance(double cosine, double ref_idx) {
-        // Use Schlick's approximation for reflectance.
-        auto r0 = (1 - ref_idx) / (1 + ref_idx);
-        r0 = r0 * r0;
-        return r0 + (1 - r0) * pow((1 - cosine), 5);
+    [[nodiscard]] color shade(const color&light_color, const point3&hit_point, const Ray&ray,
+                              const vec3&light_position, const vec3&normal, const color&object_color) const override {
+        return {0.7, 0.8, 1.0};
     }
 };
 
-class diffuse_light : public material {
-public:
-    diffuse_light(shared_ptr<texture> a) : emit(a) {}
-
-    diffuse_light(color c) : emit(make_shared<solid_color>(c)) {}
-
-    bool scatter(const ray &r_in, const hit_record &rec, color &attenuation, ray &scattered)
-    const override {
-        return false;
-    }
-
-    color emitted(double u, double v, const point3 &p) const override {
-        return emit->value(u, v, p);
-    }
-
-private:
-    shared_ptr<texture> emit;
-};
-
-#endif //RAYTRACER_MATERIAL_H
+#endif //MATERIAL_H

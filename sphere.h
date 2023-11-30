@@ -1,61 +1,62 @@
-#ifndef RAYTRACER_SPHERE_H
-#define RAYTRACER_SPHERE_H
+#ifndef SPHERE_H
+#define SPHERE_H
 
+#include "color.h"
 #include "hittable.h"
-#include "vec3.h"
+#include "material.h"
 
-class sphere : public hittable {
+class Sphere : public Hittable {
 public:
-    sphere(point3 _center, double _radius, shared_ptr<material> _material)
-            : center(_center), radius(_radius), mat(_material) {}
+    Sphere(const point3&_center, const double _radius, const color&_sphere_color,
+           const std::shared_ptr<Material>&material) : center(_center),
+                                                       radius(_radius),
+                                                       Hittable(_sphere_color, material) {
+    }
 
-    bool hit(const ray &r, interval ray_t, hit_record &rec) const override {
-        vec3 oc = r.origin() - center;
-        auto a = r.direction().length_squared();
-        auto half_b = dot(oc, r.direction());
-        auto c = oc.length_squared() - radius * radius;
 
-        auto discriminant = half_b * half_b - a * c;
+    bool intersect(const Ray&ray, double&t) const override {
+        const vec3 oc = ray.origin - center;
+        const double a = dot(ray.direction, ray.direction);
+        const double b = 2 * dot(oc, ray.direction);
+        const double c = dot(oc, oc) - pow(radius, 2);
+
+        const double discriminant = b * b - 4 * a * c;
         if (discriminant < 0) return false;
-        auto sqrtd = sqrt(discriminant);
 
-        // Find the nearest root that lies in the acceptable range.
-        auto root = (-half_b - sqrtd) / a;
-        if (!ray_t.surrounds(root)) {
-            root = (-half_b + sqrtd) / a;
-            if (!ray_t.surrounds(root))
-                return false;
+        // Find the nearest intersection which is in acceptable range
+        const double t1 = (-b - sqrt(discriminant)) / (2.0f * a);
+        const double t2 = (-b + sqrt(discriminant)) / (2.0f * a);
+
+        if (t1 > 0.001f && t1 < t) {
+            t = t1;
+            return true;
         }
 
-        rec.t = root;
-        rec.p = r.at(rec.t);
-        vec3 outward_normal = (rec.p - center) / radius;
-        rec.set_face_normal(r, outward_normal);
-        get_sphere_uv(outward_normal, rec.u, rec.v);
-        rec.mat = mat;
+        if (t2 > 0.001f && t2 < t) {
+            t = t2;
+            return true;
+        }
 
-        return true;
+        return false;
+    }
+
+    [[nodiscard]] vec3 calculate_normal(const point3&hit_point) const override {
+        return unit_vector(hit_point - center);
+    }
+
+    // Does not make sense to rotate or shear? a sphere so only translation for now
+    void apply_model_transform(const vec3&translation, const vec3&rotation, const vec3&shear, double angle) override {
+        center = center + translation;
+    }
+
+    // Not sure how much we are going to do right here
+    void apply_view_transform(const vec3&translation, const vec3&rotation, double angle, const point3&cam) override {
+        center = center + translation;
     }
 
 private:
     point3 center;
     double radius;
-    shared_ptr<material> mat;
-
-    static void get_sphere_uv(const point3 &p, double &u, double &v) {
-        // p: a given point on the sphere of radius one, centered at the origin.
-        // u: returned value [0,1] of angle around the Y axis from X=-1.
-        // v: returned value [0,1] of angle from Y=-1 to Y=+1.
-        //     <1 0 0> yields <0.50 0.50>       <-1  0  0> yields <0.00 0.50>
-        //     <0 1 0> yields <0.50 1.00>       < 0 -1  0> yields <0.50 0.00>
-        //     <0 0 1> yields <0.25 0.50>       < 0  0 -1> yields <0.75 0.50>
-
-        auto theta = acos(-p.y());
-        auto phi = atan2(-p.z(), p.x()) + pi;
-
-        u = phi / (2 * pi);
-        v = theta / pi;
-    }
 };
 
-#endif //RAYTRACER_SPHERE_H
+#endif //SPHERE_H

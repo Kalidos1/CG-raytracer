@@ -1,5 +1,4 @@
-"/Users/andre/Library/Application Support/JetBrains/Toolbox/apps/CLion/ch-0/232.9921.42/CLion.app/Contents/bin/cmake/mac/bin/cmake" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=/Users/andre/Library/Application Support/JetBrains/Toolbox/apps/CLion/ch-0/232.9921.42/CLion.app/Contents/bin/ninja/mac/ninja" -G Ninja -S /Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer -B /Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/cmake-build-debug
--- Found SFML 2.6.1 in /usr/local/lib/cmake/SFML
+"/Users/andre/Library/Application Support/JetBrains/Toolbox/apps/CLion-Nova/ch-0/233.11868/CLion 2023.3 EAP.app/Contents/bin/cmake/mac/x64/bin/cmake" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=/Users/andre/Library/Application Support/JetBrains/Toolbox/apps/CLion-Nova/ch-0/233.11868/CLion 2023.3 EAP.app/Contents/bin/ninja/mac/x64/ninja" -G Ninja -S /Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer -B /Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/cmake-build-debug
 -- Configuring done (0.1s)
 -- Generating done (0.0s)
 -- Build files have been written to: /Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/cmake-build-debug

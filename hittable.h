@@ -1,35 +1,28 @@
-#ifndef RAYTRACER_HITTABLE_H
-#define RAYTRACER_HITTABLE_H
+#ifndef HITTABLE_H
+#define HITTABLE_H
 
-#include "rtweekend.h"
+#include "material.h"
+#include "ray.h"
 
-class material;
-
-class hit_record {
+class Hittable {
 public:
-    point3 p;
-    vec3 normal;
-    shared_ptr<material> mat;
-    double t;
-    bool front_face;
-    double u;
-    double v;
+    virtual ~Hittable() = default;
 
-    void set_face_normal(const ray &r, const vec3 &outward_normal) {
-        // Sets the hit record normal vector.
-        // NOTE: the parameter `outward_normal` is assumed to have unit length.
+    vec3 object_color;
+    std::shared_ptr<Material> material;
 
-        front_face = dot(r.direction(), outward_normal) < 0;
-        normal = front_face ? outward_normal : -outward_normal;
+    Hittable(const vec3&_color, const std::shared_ptr<Material>&_material)
+        : object_color(_color), material(_material) {
     }
+
+    virtual bool intersect(const Ray&ray, double&t) const = 0;
+
+    [[nodiscard]] virtual vec3 calculate_normal(const point3&hit_point) const = 0;
+
+    virtual void apply_model_transform(const vec3&translation, const vec3&rotation, const vec3&shear,
+                                       double angle) = 0;
+
+    virtual void apply_view_transform(const vec3&translation, const vec3&rotation, double angle, const point3&cam) = 0;
 };
 
-class hittable {
-public:
-    virtual ~hittable() = default;
-
-    virtual bool hit(const ray &r, interval ray_t, hit_record &rec) const = 0;
-};
-
-
-#endif //RAYTRACER_HITTABLE_H
+#endif //HITTABLE_H
