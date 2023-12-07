@@ -22,9 +22,9 @@ public:
         const double det = dot(edge1, pvec);
 
         // Check for backfacing triangle (Negative = Backfacing, Close to 0 = Misses the triangle)
-        if (det < 0.0000f) return false;
+        if (det < 1e-10) return false;
         // Ray and triangle = parallel if det is close to 0
-        if (fabs(det) < 0.0000f) return false;
+        if (fabs(det) < 1e-10) return false;
 
         const double invDet = 1 / det;
 
@@ -44,7 +44,7 @@ public:
         return true;
     }
 
-    [[nodiscard]] vec3 calculate_normal(const point3&hit_point) const override {
+    [[nodiscard]] vec3 calculate_normal(const point3&hit_point, const Ray&ray) const override {
         const vec3 first_edge = v1 - v0;
         const vec3 second_edge = v2 - v0;
         return unit_vector(cross(first_edge, second_edge));
@@ -60,7 +60,7 @@ public:
     }
 
 
-    //Make the angle value inside the rotation matrix
+    // Make the angle value inside the rotation matrix
     // Not sure what the difference is to the model transformation except the relation to the camera
     // It might be interesting to only move the camera? But not sure
     void apply_view_transform(const vec3&translation, const vec3&rotation, double angle, const point3&camera) override {

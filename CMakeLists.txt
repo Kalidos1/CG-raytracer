@@ -11,5 +11,8 @@ add_executable(raytracer main.cpp
         ray.h
         sphere.h
         triangle.h
-        floor.h
-        mat3.h)
+        plane.h
+        mat3.h
+        bounded_plane.h
+        cube.h
+        light.h)

@@ -106,4 +106,17 @@ inline vec3 reflect(const vec3&v, const vec3&n) {
     return v - 2 * dot(v, n) * n;
 }
 
+inline double clamp(double value, double min_val, double max_val) {
+    return std::max(min_val, std::min(value, max_val));
+}
+
+inline vec3 clamp(const vec3&v, double min_val, double max_val) {
+    return {
+        clamp(v.x(), min_val, max_val),
+        clamp(v.y(), min_val, max_val),
+        clamp(v.z(), min_val, max_val)
+    };
+}
+
+
 #endif //RAYTRACER_VEC3_H

@@ -17,7 +17,7 @@ public:
 
     virtual bool intersect(const Ray&ray, double&t) const = 0;
 
-    [[nodiscard]] virtual vec3 calculate_normal(const point3&hit_point) const = 0;
+    [[nodiscard]] virtual vec3 calculate_normal(const point3&hit_point, const Ray&ray) const = 0;
 
     virtual void apply_model_transform(const vec3&translation, const vec3&rotation, const vec3&shear,
                                        double angle) = 0;

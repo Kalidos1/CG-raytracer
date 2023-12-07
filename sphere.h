@@ -40,7 +40,7 @@ public:
         return false;
     }
 
-    [[nodiscard]] vec3 calculate_normal(const point3&hit_point) const override {
+    [[nodiscard]] vec3 calculate_normal(const point3&hit_point, const Ray&ray) const override {
         return unit_vector(hit_point - center);
     }
 
