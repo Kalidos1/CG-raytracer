@@ -15,4 +15,6 @@ add_executable(raytracer main.cpp
         mat3.h
         bounded_plane.h
         cube.h
-        light.h)
+        light.h
+        bounding_box.h
+        obj_loader.h)

@@ -3,6 +3,7 @@
 
 #include "vec3.h"
 
+// Simple ray class
 struct Ray {
     vec3 origin, direction;
 

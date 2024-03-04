@@ -18,7 +18,7 @@ public:
     }
 
     mat3(const vec3&row_1, const vec3&row_2, const vec3&row_3) {
-        //Build the matrix out of 3 vectors -> maybe can be done with for loop not sure
+        //Build the matrix out of 3 vectors
         m[0][0] = row_1.x();
         m[0][1] = row_1.y();
         m[0][2] = row_1.z();
@@ -31,7 +31,6 @@ public:
     }
 
     // Function to create a rotation matrix around the given axis (normalized vector) and angle (in radians)
-    // Might be better to convert this into one single matrix that governs all different axes -> Because of multiple axes rotation
     static mat3 rotation_matrix(const vec3&axis, const double angle) {
         const double c = std::cos(angle);
         const double s = std::sin(angle);
@@ -58,7 +57,7 @@ public:
     }
 
     // Function to calculate the inverse of the matrix
-    mat3 inverse() const {
+    [[nodiscard]] mat3 inverse() const {
         const double det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
                            m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
                            m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
@@ -75,6 +74,19 @@ public:
         result.m[2][0] = (m[1][0] * m[2][1] - m[1][1] * m[2][0]) * invDet;
         result.m[2][1] = (m[0][1] * m[2][0] - m[0][0] * m[2][1]) * invDet;
         result.m[2][2] = (m[0][0] * m[1][1] - m[0][1] * m[1][0]) * invDet;
+
+        return result;
+    }
+
+    // Function to transpose a matrix
+    [[nodiscard]] mat3 transpose() const {
+        mat3 result;
+
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                result.m[i][j] = m[j][i];
+            }
+        }
 
         return result;
     }

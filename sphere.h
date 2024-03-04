@@ -7,14 +7,14 @@
 
 class Sphere : public Hittable {
 public:
-    Sphere(const point3&_center, const double _radius, const color&_sphere_color,
-           const std::shared_ptr<Material>&material) : center(_center),
-                                                       radius(_radius),
-                                                       Hittable(_sphere_color, material) {
+    Sphere(const point3 &_center, const double _radius, const color &_sphere_color,
+           const std::shared_ptr<Material> &material) : center(_center),
+                                                        radius(_radius),
+                                                        Hittable(_sphere_color, material) {
     }
 
 
-    bool intersect(const Ray&ray, double&t) const override {
+    bool intersect(const Ray &ray, double &t) const override {
         const vec3 oc = ray.origin - center;
         const double a = dot(ray.direction, ray.direction);
         const double b = 2 * dot(oc, ray.direction);
@@ -40,18 +40,30 @@ public:
         return false;
     }
 
-    [[nodiscard]] vec3 calculate_normal(const point3&hit_point, const Ray&ray) const override {
+    [[nodiscard]] vec3 calculate_normal(const point3 &hit_point, const Ray &ray) const override {
         return unit_vector(hit_point - center);
     }
 
-    // Does not make sense to rotate or shear? a sphere so only translation for now
-    void apply_model_transform(const vec3&translation, const vec3&rotation, const vec3&shear, double angle) override {
+    [[nodiscard]] point3 calculate_center() const override {
+        return center;
+    }
+
+    // Only translation, due to sphere
+    void apply_model_transform(const vec3 &translation, const vec3 &rotation, const vec3 &shear, double angle,
+                               const point3 &object_center) override {
         center = center + translation;
     }
 
-    // Not sure how much we are going to do right here
-    void apply_view_transform(const vec3&translation, const vec3&rotation, double angle, const point3&cam) override {
-        center = center + translation;
+    // We subtract to simulate camera movement
+    void apply_view_transform(const vec3 &translation, const vec3 &rotation, double angle, const point3 &cam) override {
+        center = center - translation;
+    }
+
+    [[nodiscard]] BoundingBox get_bounding_box() const override {
+        const vec3 min = center - vec3(radius, radius, radius);
+        const vec3 max = center + vec3(radius, radius, radius);
+
+        return {min, max};
     }
 
 private:

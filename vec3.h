@@ -106,10 +106,12 @@ inline vec3 reflect(const vec3&v, const vec3&n) {
     return v - 2 * dot(v, n) * n;
 }
 
+// Clamp double values to a specific value
 inline double clamp(double value, double min_val, double max_val) {
     return std::max(min_val, std::min(value, max_val));
 }
 
+// Clamp vector values to a specific value range
 inline vec3 clamp(const vec3&v, double min_val, double max_val) {
     return {
         clamp(v.x(), min_val, max_val),
