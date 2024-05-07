@@ -1,6 +1,11 @@
 #ifndef BOUNDED_PLANE_H
 #define BOUNDED_PLANE_H
 
+#include <memory>
+#include "../vec3.h"
+#include "../material.h"
+#include "../triangle.h"
+
 class BoundedPlane final : public Hittable {
 public:
     BoundedPlane(const vec3 &_position, const vec3 &_normal, const double _size, const color &_plane_color,

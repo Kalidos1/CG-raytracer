@@ -6,7 +6,7 @@ class vec3;
 
 class mat3 {
 public:
-    double m[3][3];
+    double m[3][3]{};
 
     mat3() {
         // Initialize the matrix as an identity matrix

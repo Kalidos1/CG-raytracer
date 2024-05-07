@@ -3,10 +3,7 @@
 #include "color.h"
 #include "vec3.h"
 #include "ray.h"
-#include "sphere.h"
-#include "plane.h"
 #include "triangle.h"
-#include "cube.h"
 
 #include <iostream>
 #include <fstream>
@@ -17,97 +14,124 @@
 #include "obj_loader.h"
 
 #include <chrono>
+#include <filesystem>
 
 using namespace std::chrono;
 
+//struct BVHNode {
+//    BoundingBox bounds;
+//    std::shared_ptr<Hittable> hittable;
+//    BVHNode *left{};
+//    BVHNode *right{};
+//
+//    static BVHNode *constructBVH(const std::vector<std::shared_ptr<Hittable>> &hittables) {
+//        if (hittables.empty()) {
+//            return nullptr;
+//        }
+//
+//        if (hittables.size() == 1) {
+//            auto *leaf = new BVHNode;
+//            leaf->hittable = hittables[0];
+//            leaf->bounds = hittables[0]->get_bounding_box();
+//            leaf->right = nullptr;
+//            leaf->left = nullptr;
+//            return leaf;
+//        }
+//
+//        // Check if there are non-valid objects that should not be included (e.g. infinite plane)
+//        std::vector<std::shared_ptr<Hittable>> valid_hittables;
+//        valid_hittables.reserve(hittables.size());
+//        for (const auto &hittable: hittables) {
+//            if (hittable->get_bounding_box().isValid()) {
+//                valid_hittables.push_back(hittable);
+//            }
+//        }
+//
+//        // Split objects into left and right
+//        std::vector<std::shared_ptr<Hittable>> left_hittables, right_hittables;
+//        splitObjects(valid_hittables, left_hittables, right_hittables);
+//
+//        auto *internalNode = new BVHNode;
+//        // Recursively build the tree until last object is encapsulated
+//        internalNode->left = constructBVH(left_hittables);
+//        internalNode->right = constructBVH(right_hittables);
+//
+//        // Update bounding box values
+//        internalNode->bounds = combineBoundingBoxes(internalNode->left->bounds, internalNode->right->bounds);
+//
+//        return internalNode;
+//    }
+//
+//    static void splitObjects(const std::vector<std::shared_ptr<Hittable>> &hittables,
+//                             std::vector<std::shared_ptr<Hittable>> &left_hittables,
+//                             std::vector<std::shared_ptr<Hittable>> &right_hittables) {
+//        // Implement splitting strategy
+//        for (int i = 0; i < hittables.size(); ++i) {
+//            if (i < (hittables.size() / 2)) {
+//                left_hittables.push_back(hittables[i]);
+//            } else {
+//                right_hittables.push_back(hittables[i]);
+//            }
+//        }
+//    }
+//
+//    static BoundingBox combineBoundingBoxes(const BoundingBox &box1, const BoundingBox &box2) {
+//        BoundingBox combinedBox;
+//        combinedBox.min = vec3(
+//                std::min(box1.min.x(), box2.min.x()),
+//                std::min(box1.min.y(), box2.min.y()),
+//                std::min(box1.min.z(), box2.min.z())
+//        );
+//        combinedBox.max = vec3(
+//                std::max(box1.max.x(), box2.max.x()),
+//                std::max(box1.max.y(), box2.max.y()),
+//                std::max(box1.max.z(), box2.max.z())
+//        );
+//        return combinedBox;
+//    }
+//
+//    bool intersect(const Ray &ray, double &t) const {
+//        if (!bounds.intersect(ray)) {
+//            return false; // No intersection with bounding box
+//        }
+//
+//        if (hittable) {
+//            return hittable->intersect(ray, t); // Intersect with the contained object
+//        }
+//
+//        // Recursive intersection with left and right children
+//        bool hitLeft = left && left->intersect(ray, t);
+//        bool hitRight = right && right->intersect(ray, t);
+//
+//        return hitLeft || hitRight;
+//    }
+//};
+
 struct BVHNode {
-    BoundingBox bounds;
-    std::shared_ptr<Hittable> hittable;
-    BVHNode *left{};
-    BVHNode *right{};
-
-    static BVHNode *constructBVH(const std::vector<std::shared_ptr<Hittable>> &hittables) {
-        if (hittables.empty()) {
-            return nullptr;
-        }
-
-        if (hittables.size() == 1) {
-            auto *leaf = new BVHNode;
-            leaf->hittable = hittables[0];
-            leaf->bounds = hittables[0]->get_bounding_box();
-            leaf->right = nullptr;
-            leaf->left = nullptr;
-            return leaf;
-        }
-
-        // Check if there are non-valid objects that should not be included (e.g. infinite plane)
-        std::vector<std::shared_ptr<Hittable>> valid_hittables;
-        valid_hittables.reserve(hittables.size());
-        for (const auto &hittable: hittables) {
-            if (hittable->get_bounding_box().isValid()) {
-                valid_hittables.push_back(hittable);
-            }
-        }
-
-        // Split objects into left and right
-        std::vector<std::shared_ptr<Hittable>> left_hittables, right_hittables;
-        splitObjects(valid_hittables, left_hittables, right_hittables);
-
-        auto *internalNode = new BVHNode;
-        // Recursively build the tree until last object is encapsulated
-        internalNode->left = constructBVH(left_hittables);
-        internalNode->right = constructBVH(right_hittables);
-
-        // Update bounding box values
-        internalNode->bounds = combineBoundingBoxes(internalNode->left->bounds, internalNode->right->bounds);
-
-        return internalNode;
-    }
-
-    static void splitObjects(const std::vector<std::shared_ptr<Hittable>> &hittables,
-                             std::vector<std::shared_ptr<Hittable>> &left_hittables,
-                             std::vector<std::shared_ptr<Hittable>> &right_hittables) {
-        // Implement splitting strategy
-        for (int i = 0; i < hittables.size(); ++i) {
-            if (i < (hittables.size() / 2)) {
-                left_hittables.push_back(hittables[i]);
-            } else {
-                right_hittables.push_back(hittables[i]);
-            }
-        }
-    }
-
-    static BoundingBox combineBoundingBoxes(const BoundingBox &box1, const BoundingBox &box2) {
-        BoundingBox combinedBox;
-        combinedBox.min = vec3(
-                std::min(box1.min.x(), box2.min.x()),
-                std::min(box1.min.y(), box2.min.y()),
-                std::min(box1.min.z(), box2.min.z())
-        );
-        combinedBox.max = vec3(
-                std::max(box1.max.x(), box2.max.x()),
-                std::max(box1.max.y(), box2.max.y()),
-                std::max(box1.max.z(), box2.max.z())
-        );
-        return combinedBox;
-    }
-
-    bool intersect(const Ray &ray, double &t) const {
-        if (!bounds.intersect(ray)) {
-            return false; // No intersection with bounding box
-        }
-
-        if (hittable) {
-            return hittable->intersect(ray, t); // Intersect with the contained object
-        }
-
-        // Recursive intersection with left and right children
-        bool hitLeft = left && left->intersect(ray, t);
-        bool hitRight = right && right->intersect(ray, t);
-
-        return hitLeft || hitRight;
-    }
+    vec3 aabbMin, aabbMax;
+    unsigned int leftChild{}, rightChild{};
+    bool isLeaf{};
+    unsigned int firstPrim{}, primCount{};
 };
+
+const auto number_of_triangles = 200;
+BVHNode bvhNode[number_of_triangles * 2 - 1];
+unsigned int rootNodeIdx = 0, nodesUsed = 1;
+
+void build_bvh() {
+    BVHNode root = bvhNode[rootNodeIdx];
+    root.leftChild = root.rightChild = 0;
+    root.firstPrim = 0, root.primCount = number_of_triangles;
+    update_node_bounds(rootNodeIdx);
+    subdivide(rootNodeIdx);
+}
+
+void update_node_bounds(unsigned int nodeIdx) {
+    BVHNode &node = bvhNode[nodeIdx];
+    node.aabbMin = vec3(1e30f, 1e30f, 1e30f);
+    node.aabbMax = vec3(-1e30f, -1e30f, -1e30f);
+
+}
 
 
 // Tone mapping after https://bruop.github.io/tonemapping/
@@ -246,15 +270,9 @@ vec3 trace(const Ray &ray, const std::vector<std::shared_ptr<Hittable>> &hittabl
                 return trace(reflected_ray, hittables, lights, depth - 1);
             }
 
-            if (const auto plane = std::dynamic_pointer_cast<Plane>(hitObject)) {
-                shade_color = hitObject->material->shade(light, plane->transform_inverse(hit_point), ray,
-                                                         normal,
-                                                         hitObject->object_color);
-            } else {
-                shade_color = hitObject->material->shade(light, hit_point, ray,
-                                                         normal,
-                                                         hitObject->object_color);
-            }
+            shade_color = hitObject->material->shade(light, hit_point, ray,
+                                                     normal, hitObject->object_color);
+
 
             if (occluded(light, hit_point, hittables, t)) {
                 shade_color *= 0.7;
@@ -295,7 +313,7 @@ void render(const int files) {
         const int image_height = 800;
 
         // Camera
-        point3 camera = point3(0, 0, 25);
+        point3 camera = point3(0, 0, 20);
         vec3 camera_direction = vec3(0, 0, -1);
 
         // Lights
@@ -309,29 +327,26 @@ void render(const int files) {
                 CheckeredMaterial>(5, color(0.7, 0.7, 0.7), color(0.3, 0.3, 0.3));
         auto mirror_material = std::make_shared<Mirror>(vec3(0.8, 0.3, 0.3));
 
+
         //Objects
         std::vector<std::shared_ptr<Hittable>> hittables;
-        hittables.reserve(100);
 
+        hittables.reserve(number_of_triangles);
 
-        // Floor
-        hittables.emplace_back(std::make_shared<Plane>(vec3(0, -10, 0), vec3(0, 1, 0), white,
-                                                       checkered_material));
+        for (int j = 0; j < number_of_triangles; j++) {
+            auto r0 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
+            auto r1 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
+            auto r2 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
 
-        // Cubes
-        hittables.emplace_back(std::make_shared<Cube>(point3(-8, -3, -1), color(1, 0, 0), 6, phong_material));
-        hittables.emplace_back(std::make_shared<Cube>(point3(0, -3, -1), color(0, 1, 0), 6, phong_material));
-        hittables.emplace_back(std::make_shared<Cube>(point3(8, -3, -1), color(0, 0, 1), 6, phong_material));
+            auto vertex0 = (r0 * 9) - vec3(5, 5, 5);
+            hittables.emplace_back(
+                    std::make_shared<Triangle>(vertex0, vertex0 + r1, vertex0 + r2, color(1, 1, 0),
+                                               lambertian_material));
+        }
 
-        // Spheres
-        //Green sphere
-        hittables.emplace_back(std::make_shared<Sphere>(point3(9, 6, -1), 4, color(1, 0, 1), mirror_material));
-
-        // Red sphere
-        hittables.emplace_back(std::make_shared<Sphere>(point3(-9, 6, -1), 4, color(1, 0, 0), mirror_material));
-
-        // Blue sphere
-        hittables.emplace_back(std::make_shared<Sphere>(point3(4, 3, -1), 1, color(0, 0, 1), phong_material));
+        // Triangle
+        hittables.emplace_back(std::make_shared<Triangle>(vec3(-1, -1, 0), vec3(2, 2, 0), vec3(0, 2, 2), color(1, 1, 0),
+                                                          phong_material));
 
         // Get filename in subfolder
         std::string filename = "obj_files/teapot.obj";
@@ -374,15 +389,15 @@ void render(const int files) {
             // Add all triangles to the scene
             hittables.reserve(triangles.size());
             for (const auto &triangle: triangles) {
-                hittables.emplace_back(std::make_shared<Triangle>(triangle));
+                // hittables.emplace_back(std::make_shared<Triangle>(triangle));
             }
         }
 
         // Transform objects with model transform
-        for (const auto &object: hittables) {
-            object->apply_model_transform(vec3(0, 0, 0), vec3(0, 1, 0), vec3(0, 0, 0), 25,
-                                          object->calculate_center());
-        }
+//        for (const auto &object: hittables) {
+//            object->apply_model_transform(vec3(0, 0, 0), vec3(0, 1, 0), vec3(0, 0, 0), 25,
+//                                          object->calculate_center());
+//        }
 
         const vec3 rotation_vector = vec3(0, 1, 0);
 
@@ -392,7 +407,7 @@ void render(const int files) {
         }
 
         // Make transform to light to simulate camera movement
-        light.apply_view_transform(vec3(0, 0, 0), rotation_vector, 20);
+//        light.apply_view_transform(vec3(0, 0, 0), rotation_vector, 20);
         // Create the light plane which simulates 3x3 light
         const std::vector<std::shared_ptr<Light>> lights = light.createPlaneLight();
 

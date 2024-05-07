@@ -1,6 +1,7 @@
 #ifndef HITTABLE_H
 #define HITTABLE_H
 
+#include <memory>
 #include "bounding_box.h"
 #include "material.h"
 #include "ray.h"

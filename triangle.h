@@ -1,6 +1,7 @@
 #ifndef TRIANGLE_H
 #define TRIANGLE_H
 
+#include <memory>
 #include "hittable.h"
 #include "mat3.h"
 
@@ -79,24 +80,24 @@ public:
 
     [[nodiscard]] BoundingBox get_bounding_box() const override {
         // Get min value of all triangle sides
-        const vec3 min(
-                std::min({v0.x(), v1.x(), v2.x()}),
-                std::min({v0.y(), v1.y(), v2.y()}),
-                std::min({v0.z(), v1.z(), v2.z()})
-        );
+//        const vec3 min(
+//                std::min({v0.x(), v1.x(), v2.x()}),
+//                std::min({v0.y(), v1.y(), v2.y()}),
+//                std::min({v0.z(), v1.z(), v2.z()})
+//        );
+//
+//        // Get max value of all triangle sides
+//        const vec3 max(
+//                std::max({v0.x(), v1.x(), v2.x()}),
+//                std::max({v0.y(), v1.y(), v2.y()}),
+//                std::max({v0.z(), v1.z(), v2.z()})
+//        );
 
-        // Get max value of all triangle sides
-        const vec3 max(
-                std::max({v0.x(), v1.x(), v2.x()}),
-                std::max({v0.y(), v1.y(), v2.y()}),
-                std::max({v0.z(), v1.z(), v2.z()})
-        );
-
-        return {min, max};
+        return {vec3(0, 0, 0), vec3(0, 0, 0)};
     }
 
 
-    double degrees_to_radians(double degrees) {
+    static double degrees_to_radians(double degrees) {
         return degrees * M_PI / 180.0;
     }
 

@@ -24,14 +24,14 @@ public:
     std::vector<std::shared_ptr<Light>> createPlaneLight() {
         std::vector<std::shared_ptr<Light>> lights;
         lights.emplace_back(std::make_shared<Light>(light_color, origin, direction, intensity));
-        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0.1, 0, 0), direction, intensity));
-        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(-0.1, 0, 0), direction, intensity));
-        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0, 0.1, 0), direction, intensity));
-        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0.1, 0.1, 0), direction, intensity));
-        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(-0.1, 0.1, 0), direction, intensity));
-        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0, -0.1, 0), direction, intensity));
-        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0.1, -0.1, 0), direction, intensity));
-        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(-0.1, -0.1, 0), direction, intensity));
+//        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0.1, 0, 0), direction, intensity));
+//        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(-0.1, 0, 0), direction, intensity));
+//        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0, 0.1, 0), direction, intensity));
+//        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0.1, 0.1, 0), direction, intensity));
+//        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(-0.1, 0.1, 0), direction, intensity));
+//        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0, -0.1, 0), direction, intensity));
+//        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(0.1, -0.1, 0), direction, intensity));
+//        lights.emplace_back(std::make_shared<Light>(light_color, origin + point3(-0.1, -0.1, 0), direction, intensity));
 
         return lights;
     }

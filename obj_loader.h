@@ -16,6 +16,7 @@
 
 // Math.h - STD math Library
 #include <math.h>
+#include <filesystem>
 
 // Print progress to console while loading (large models)
 #define OBJL_CONSOLE_OUTPUT
@@ -389,13 +390,9 @@ namespace objl {
 		//
 		// If the file is unable to be found
 		// or unable to be loaded return false
-		bool LoadFile(std::string Path) {
-			// If the file is not an .obj file return false
-			if (Path.substr(Path.size() - 4, 4) != ".obj")
-				return false;
+        bool LoadFile(std::filesystem::__cxx11::path Path) {
 
-
-			std::ifstream file(Path);
+            std::ifstream file(Path);
 
 			if (!file.is_open())
 				return false;
@@ -582,7 +579,7 @@ namespace objl {
 
 					// Generate a path to the material file
 					std::vector<std::string> temp;
-					algorithm::split(Path, temp, "/");
+                    algorithm::split(Path.string(), temp, "/");
 
 					std::string pathtomat = "";
 
