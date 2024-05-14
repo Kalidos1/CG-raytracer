@@ -16,7 +16,7 @@ public:
 
     // MT (Moeller-Trumbore) intersection algorithm -> https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection.html
     // Put the initial x,y,z triangle into u,v space and then calculate the positions of pixels inside barycentric coordinates
-    bool intersect(const Ray &ray, double &t) const override {
+    bool intersect(Ray &ray) const override {
         const vec3 edge1 = v1 - v0;
         const vec3 edge2 = v2 - v0;
         const vec3 pvec = cross(ray.direction, edge2);
@@ -40,7 +40,8 @@ public:
         if (v < 0 || u + v > 1) return false;
 
         // If we have a intersection we calculate the pixel point
-        t = dot(edge2, qvec) * invDet;
+        double t = dot(edge2, qvec) * invDet;
+        if (t > 0.0001f) ray.t = std::min(ray.t, t);
 
         return true;
     }
@@ -52,7 +53,7 @@ public:
     }
 
     [[nodiscard]] point3 calculate_center() const override {
-        return (v0, v1, v2) / 3.0;
+        return (v0 + v1 + v2) / 3.0;
     }
 
     void apply_model_transform(const vec3 &translation, const vec3 &rotation, const vec3 &shear,
@@ -79,21 +80,21 @@ public:
     }
 
     [[nodiscard]] BoundingBox get_bounding_box() const override {
-        // Get min value of all triangle sides
-//        const vec3 min(
-//                std::min({v0.x(), v1.x(), v2.x()}),
-//                std::min({v0.y(), v1.y(), v2.y()}),
-//                std::min({v0.z(), v1.z(), v2.z()})
-//        );
-//
-//        // Get max value of all triangle sides
-//        const vec3 max(
-//                std::max({v0.x(), v1.x(), v2.x()}),
-//                std::max({v0.y(), v1.y(), v2.y()}),
-//                std::max({v0.z(), v1.z(), v2.z()})
-//        );
+        //Get min value of all triangle sides
+        const vec3 min(
+                vec3_min({v0.x(), v1.x(), v2.x()}),
+                vec3_min({v0.y(), v1.y(), v2.y()}),
+                vec3_min({v0.z(), v1.z(), v2.z()})
+        );
 
-        return {vec3(0, 0, 0), vec3(0, 0, 0)};
+        // Get max value of all triangle sides
+        const vec3 max(
+                vec3_max({v0.x(), v1.x(), v2.x()}),
+                vec3_max({v0.y(), v1.y(), v2.y()}),
+                vec3_max({v0.z(), v1.z(), v2.z()})
+        );
+
+        return {min, max};
     }
 
 

@@ -12,127 +12,14 @@
 #include "bounding_box.h"
 #include "light.h"
 #include "obj_loader.h"
+#include "bvh_builder.h"
 
 #include <chrono>
 #include <filesystem>
+#include <algorithm>
+#include <limits>
 
 using namespace std::chrono;
-
-//struct BVHNode {
-//    BoundingBox bounds;
-//    std::shared_ptr<Hittable> hittable;
-//    BVHNode *left{};
-//    BVHNode *right{};
-//
-//    static BVHNode *constructBVH(const std::vector<std::shared_ptr<Hittable>> &hittables) {
-//        if (hittables.empty()) {
-//            return nullptr;
-//        }
-//
-//        if (hittables.size() == 1) {
-//            auto *leaf = new BVHNode;
-//            leaf->hittable = hittables[0];
-//            leaf->bounds = hittables[0]->get_bounding_box();
-//            leaf->right = nullptr;
-//            leaf->left = nullptr;
-//            return leaf;
-//        }
-//
-//        // Check if there are non-valid objects that should not be included (e.g. infinite plane)
-//        std::vector<std::shared_ptr<Hittable>> valid_hittables;
-//        valid_hittables.reserve(hittables.size());
-//        for (const auto &hittable: hittables) {
-//            if (hittable->get_bounding_box().isValid()) {
-//                valid_hittables.push_back(hittable);
-//            }
-//        }
-//
-//        // Split objects into left and right
-//        std::vector<std::shared_ptr<Hittable>> left_hittables, right_hittables;
-//        splitObjects(valid_hittables, left_hittables, right_hittables);
-//
-//        auto *internalNode = new BVHNode;
-//        // Recursively build the tree until last object is encapsulated
-//        internalNode->left = constructBVH(left_hittables);
-//        internalNode->right = constructBVH(right_hittables);
-//
-//        // Update bounding box values
-//        internalNode->bounds = combineBoundingBoxes(internalNode->left->bounds, internalNode->right->bounds);
-//
-//        return internalNode;
-//    }
-//
-//    static void splitObjects(const std::vector<std::shared_ptr<Hittable>> &hittables,
-//                             std::vector<std::shared_ptr<Hittable>> &left_hittables,
-//                             std::vector<std::shared_ptr<Hittable>> &right_hittables) {
-//        // Implement splitting strategy
-//        for (int i = 0; i < hittables.size(); ++i) {
-//            if (i < (hittables.size() / 2)) {
-//                left_hittables.push_back(hittables[i]);
-//            } else {
-//                right_hittables.push_back(hittables[i]);
-//            }
-//        }
-//    }
-//
-//    static BoundingBox combineBoundingBoxes(const BoundingBox &box1, const BoundingBox &box2) {
-//        BoundingBox combinedBox;
-//        combinedBox.min = vec3(
-//                std::min(box1.min.x(), box2.min.x()),
-//                std::min(box1.min.y(), box2.min.y()),
-//                std::min(box1.min.z(), box2.min.z())
-//        );
-//        combinedBox.max = vec3(
-//                std::max(box1.max.x(), box2.max.x()),
-//                std::max(box1.max.y(), box2.max.y()),
-//                std::max(box1.max.z(), box2.max.z())
-//        );
-//        return combinedBox;
-//    }
-//
-//    bool intersect(const Ray &ray, double &t) const {
-//        if (!bounds.intersect(ray)) {
-//            return false; // No intersection with bounding box
-//        }
-//
-//        if (hittable) {
-//            return hittable->intersect(ray, t); // Intersect with the contained object
-//        }
-//
-//        // Recursive intersection with left and right children
-//        bool hitLeft = left && left->intersect(ray, t);
-//        bool hitRight = right && right->intersect(ray, t);
-//
-//        return hitLeft || hitRight;
-//    }
-//};
-
-struct BVHNode {
-    vec3 aabbMin, aabbMax;
-    unsigned int leftChild{}, rightChild{};
-    bool isLeaf{};
-    unsigned int firstPrim{}, primCount{};
-};
-
-const auto number_of_triangles = 200;
-BVHNode bvhNode[number_of_triangles * 2 - 1];
-unsigned int rootNodeIdx = 0, nodesUsed = 1;
-
-void build_bvh() {
-    BVHNode root = bvhNode[rootNodeIdx];
-    root.leftChild = root.rightChild = 0;
-    root.firstPrim = 0, root.primCount = number_of_triangles;
-    update_node_bounds(rootNodeIdx);
-    subdivide(rootNodeIdx);
-}
-
-void update_node_bounds(unsigned int nodeIdx) {
-    BVHNode &node = bvhNode[nodeIdx];
-    node.aabbMin = vec3(1e30f, 1e30f, 1e30f);
-    node.aabbMax = vec3(-1e30f, -1e30f, -1e30f);
-
-}
-
 
 // Tone mapping after https://bruop.github.io/tonemapping/
 double tone_map(const double hit) {
@@ -178,15 +65,14 @@ bool occluded(const std::shared_ptr<Light> &light, const vec3 &hit_point,
               double t) {
     //Calculate light direction and shadow ray (From hitpoint to light source)
     const vec3 light_direction = unit_vector(light->origin - hit_point);
-    const Ray shadow_ray(hit_point, light_direction);
+    Ray shadow_ray(hit_point, light_direction);
 
     // Check if the shadow ray intersects with any object
     for (const auto &hittable: hittables) {
         // Check if the shadow ray intersects with the object
         // If the distance from the hit point -> Intersection point is greater than hit point
         // -> Light source than we do not consider this point because it is technically behind the light
-        if (hittable->intersect(shadow_ray, t) && t < (light->origin - hit_point).length() &&
-            hittable->get_bounding_box().isValid()) {
+        if (hittable->intersect(shadow_ray) && t < (light->origin - hit_point).length()) {
             // Check if the intersection point is on the same object
             const vec3 intersection_point = shadow_ray.origin + shadow_ray.direction * t;
             if ((intersection_point - hit_point).length() > 1e-6) return true;
@@ -196,90 +82,55 @@ bool occluded(const std::shared_ptr<Light> &light, const vec3 &hit_point,
 }
 
 
-vec3 trace(const Ray &ray, const std::vector<std::shared_ptr<Hittable>> &hittables,
+vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
            const std::vector<std::shared_ptr<Light>> &lights,
-           const int depth) {
+           const int depth, BVHBuilder bvhBuilder) {
     if (depth <= 0) {
         // Maximum recursion depth reached, return background color
         return {0.7, 0.8, 1.0};
     }
 
-    double t = std::numeric_limits<double>::infinity();
     int hit_object = -1;
 
-    // Find the nearest object intersection
-    for (int i = 0; i < hittables.size(); ++i) {
-        double current_t = t;
-        if (hittables[i]->intersect(ray, current_t) && current_t < t) {
-            t = current_t;
-            hit_object = i;
-        }
-    }
+    bvhBuilder.intersect_bvh(ray, hittables, hit_object);
 
-//    double tBVH;
-//    std::shared_ptr<Hittable> hit_object_BVH;
-//
-//    // Find the nearest object intersection within the BVH
-//    if (bvh_tree->intersect(ray, tBVH)) {
-//        // Intersection with BVH node, check individual objects within the node
-//        const BVHNode *currentNode = bvh_tree;
-//
-//        while (currentNode->left != nullptr || currentNode->right != nullptr) {
-//            int leftHit = -1, rightHit = -1;
-//
-//            if (currentNode->left != nullptr) {
-//                leftHit = currentNode->left->intersect(ray, tBVH) ? 1 : 0;
-//            }
-//
-//            if (currentNode->right != nullptr) {
-//                rightHit = currentNode->right->intersect(ray, tBVH) ? 1 : 0;
-//            }
-//
-//            if (leftHit == -1 && rightHit == -1) {
-//                break; // Both children are nullptr
-//            }
-//
-//            if (leftHit == 1 && rightHit == 1) {
-//                // Both children hit, choose the one closer
-//                currentNode = (tBVH < currentNode->right->bounds.min_distance(ray.origin))
-//                              ? currentNode->left
-//                              : currentNode->right;
-//            } else {
-//                // Only one child hit, choose that one
-//                currentNode = (leftHit == 1) ? currentNode->left : currentNode->right;
-//            }
+
+    //Find the nearest object intersection
+//    for (int i = 0; i < hittables.size(); ++i) {
+//        if (hittables[i]->intersect(ray)) {
+//            hit_object = i;
 //        }
-//
-//        hit_object_BVH = currentNode->hittable; // Get the hittable from the leaf node
 //    }
 
-    if (hit_object != -1) {
+    if (hit_object != -1 && ray.t < std::numeric_limits<double>::max()) {
         const std::shared_ptr<Hittable> &hitObject = hittables[hit_object];
 
         // Calculate the hit point and normal of the object
-        const vec3 hit_point = ray.origin + ray.direction * t;
+        const vec3 hit_point = ray.origin + ray.direction * ray.t;
         const vec3 normal = hitObject->calculate_normal(hit_point, ray);
 
         color hit_color = color(0, 0, 0);
         color shade_color = color(0, 0, 0);
         for (auto &light: lights) {
             // Check if the material is mirror, and if so, compute reflection recursively
-            if (const auto mirrorMaterial = std::dynamic_pointer_cast<Mirror>(hitObject->material)) {
-                const vec3 reflected = reflect(unit_vector(ray.direction), normal);
-                const Ray reflected_ray(hit_point, reflected);
-                return trace(reflected_ray, hittables, lights, depth - 1);
-            }
+//            if (const auto mirrorMaterial = std::dynamic_pointer_cast<Mirror>(hitObject->material)) {
+//                const vec3 reflected = reflect(unit_vector(ray.direction), normal);
+//                const Ray reflected_ray(hit_point, reflected);
+//                return trace(reflected_ray, hittables, lights, depth - 1);
+//            }
 
             shade_color = hitObject->material->shade(light, hit_point, ray,
                                                      normal, hitObject->object_color);
 
 
-            if (occluded(light, hit_point, hittables, t)) {
+            if (occluded(light, hit_point, hittables, ray.t)) {
                 shade_color *= 0.7;
                 hit_color += shade_color;
             } else {
                 hit_color += shade_color;
             }
+
+            hit_color += shade_color;
         }
 
         // Apply tone mapping
@@ -313,7 +164,7 @@ void render(const int files) {
         const int image_height = 800;
 
         // Camera
-        point3 camera = point3(0, 0, 20);
+        point3 camera = point3(0, 0, 10);
         vec3 camera_direction = vec3(0, 0, -1);
 
         // Lights
@@ -331,22 +182,19 @@ void render(const int files) {
         //Objects
         std::vector<std::shared_ptr<Hittable>> hittables;
 
-        hittables.reserve(number_of_triangles);
+        //hittables.reserve(number_of_triangles);
 
-        for (int j = 0; j < number_of_triangles; j++) {
-            auto r0 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
-            auto r1 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
-            auto r2 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
-
-            auto vertex0 = (r0 * 9) - vec3(5, 5, 5);
-            hittables.emplace_back(
-                    std::make_shared<Triangle>(vertex0, vertex0 + r1, vertex0 + r2, color(1, 1, 0),
-                                               lambertian_material));
-        }
-
-        // Triangle
-        hittables.emplace_back(std::make_shared<Triangle>(vec3(-1, -1, 0), vec3(2, 2, 0), vec3(0, 2, 2), color(1, 1, 0),
-                                                          phong_material));
+//        for (int j = 0; j < number_of_triangles; j++) {
+//            auto r0 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
+//            auto r1 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
+//            auto r2 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
+//
+//            auto vertex0 = (r0 * 9) - vec3(5, 5, 5);
+//
+//            hittables.emplace_back(
+//                    std::make_shared<Triangle>(vertex0, vertex0 + r1, vertex0 + r2, color(1, 1, 0),
+//                                               lambertian_material));
+//        }
 
         // Get filename in subfolder
         std::string filename = "obj_files/teapot.obj";
@@ -376,7 +224,7 @@ void render(const int files) {
                             currentMesh.Vertices[idx3].Position.Z);
 
                     // Create the triangle
-                    Triangle triangle(v1, v2, v3, color(1, 1, 0), phong_material);
+                    Triangle triangle(v1, v2, v3, color(1, 1, 0), lambertian_material);
 
                     // first vertex coordinates -> Update min and mx by comparing them -> Min smaller -> Max larger
                     // Calculate center -> sum up all vertex coordinates -> divide the sum of x y and z by total number of vertices
@@ -388,8 +236,9 @@ void render(const int files) {
 
             // Add all triangles to the scene
             hittables.reserve(triangles.size());
+            std::cout << "Triangles size: " << triangles.size() << std::endl;
             for (const auto &triangle: triangles) {
-                // hittables.emplace_back(std::make_shared<Triangle>(triangle));
+                hittables.emplace_back(std::make_shared<Triangle>(triangle));
             }
         }
 
@@ -411,13 +260,19 @@ void render(const int files) {
         // Create the light plane which simulates 3x3 light
         const std::vector<std::shared_ptr<Light>> lights = light.createPlaneLight();
 
-        // Create the BVH root node to traverse
-        //BVHNode *bvhRoot = BVHNode::constructBVH(hittables);
+        auto startBVH = high_resolution_clock::now();
+
+        BVHBuilder bvhBuilder = *new BVHBuilder(hittables.size());
+        bvhBuilder.build_bvh(hittables);
+
+        auto stopBVH = high_resolution_clock::now();
+        auto durationBVH = duration_cast<microseconds>(stopBVH - startBVH);
 
         // Render
         myFile << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
         // Go over every pixel in image height and width
+        auto startPixel = high_resolution_clock::now();
         for (int j = 0; j < image_height; ++j) {
             std::clog << "\rScanlines remaining: " << image_height - j << ' ' << std::flush;
             for (int k = 0; k < image_width; ++k) {
@@ -425,21 +280,36 @@ void render(const int files) {
                 // 4x supersampling
                 // Cast multiple rays through different sub-pixel locations within the pixel (Make each pixel into 4 parts)
                 // Average the colors obtained from these 4 rays to get the final pixel color
-                for (int sy = 0; sy < 2; ++sy) {
-                    for (int sx = 0; sx < 2; ++sx) {
-                        // Get values between 0 and 1 to normalize coords
-                        // -> Does allow mapping of pixels to point on the image regardless of resolution
-                        const double u = (k - image_width / 2 + 0.5 + sx * 0.5) / image_width;
-                        const double v = (image_height / 2 - j - 0.5 - sy * 0.5) / image_height;
+//                for (int sy = 0; sy < 2; ++sy) {
+//                    for (int sx = 0; sx < 2; ++sx) {
+//                        // Get values between 0 and 1 to normalize coords
+//                        // -> Does allow mapping of pixels to point on the image regardless of resolution
+//                        const double u = (k - image_width / 2 + 0.5 + sx * 0.5) / image_width;
+//                        const double v = (image_height / 2 - j - 0.5 - sy * 0.5) / image_height;
+//
+//                        Ray ray(camera, camera_direction + vec3(u, v, 0));
+//                        pixel_color = pixel_color + trace(ray, hittables, lights, 1, rootNodeIdx);
+//                    }
+//                }
 
-                        Ray ray(camera, camera_direction + vec3(u, v, 0));
-                        pixel_color = pixel_color + trace(ray, hittables, lights, 4);
-                    }
-                }
+                const double u = static_cast<double>(k - image_width / 2) / image_width;
+                const double v = static_cast<double>(image_height / 2 - j) / image_height;
+                Ray ray(camera, camera_direction + vec3(u, v, 0));
+                pixel_color = trace(ray, hittables, lights, 2, bvhBuilder);
+
+
                 // Apply color correction and write colors to file
-                write_color(myFile, pixel_color * 0.25);
+                write_color(myFile, pixel_color);
             }
         }
+        auto stopPixel = high_resolution_clock::now();
+        auto durationPixel = duration_cast<microseconds>(stopPixel - startPixel);
+
+        std::cout << "\nTime taken by BVH construction: "
+                  << durationBVH.count() << " microseconds" << std::endl;
+
+        std::cout << "Time taken by tracing scene: "
+                  << durationPixel.count() << " microseconds" << std::endl;
 
         myFile.close();
     }
@@ -453,6 +323,6 @@ int main() {
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
 
-    std::cout << "Time taken by function: "
+    std::cout << "Time taken total: "
               << duration.count() << " microseconds" << std::endl;
 }

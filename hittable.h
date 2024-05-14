@@ -18,7 +18,7 @@ public:
             : object_color(_color), material(_material) {
     }
 
-    virtual bool intersect(const Ray &ray, double &t) const = 0;
+    [[nodiscard]] virtual bool intersect(Ray &ray) const = 0;
 
     [[nodiscard]] virtual vec3 calculate_normal(const point3 &hit_point, const Ray &ray) const = 0;
 

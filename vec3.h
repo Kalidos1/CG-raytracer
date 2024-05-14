@@ -122,5 +122,21 @@ inline vec3 clamp(const vec3&v, double min_val, double max_val) {
     };
 }
 
+double vec3_min(const vec3 &v) {
+    return std::min(v.e[0], std::min(v.e[1], v.e[2]));
+}
+
+double vec3_max(const vec3 &v) {
+    return std::max(v.e[0], std::max(v.e[1], v.e[2]));
+}
+
+inline vec3 min(const vec3 &a, const vec3 &b) {
+    return {std::min(a.e[0], b.e[0]), std::min(a.e[1], b.e[1]), std::min(a.e[2], b.e[2])};
+}
+
+inline vec3 max(const vec3 &a, const vec3 &b) {
+    return {std::max(a.e[0], b.e[0]), std::max(a.e[1], b.e[1]), std::max(a.e[2], b.e[2])};
+}
+
 
 #endif //RAYTRACER_VEC3_H

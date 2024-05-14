@@ -106,10 +106,7 @@
 				8,
 				9,
 				10,
-				11,
-				12,
-				13,
-				14
+				11
 			]
 		}
 	],
@@ -148,32 +145,12 @@
 		},
 		{
 			"backtrace" : 1,
-			"path" : "sphere.h",
-			"sourceGroupIndex" : 1
-		},
-		{
-			"backtrace" : 1,
 			"path" : "triangle.h",
 			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 1,
-			"path" : "plane.h",
-			"sourceGroupIndex" : 1
-		},
-		{
-			"backtrace" : 1,
 			"path" : "mat3.h",
-			"sourceGroupIndex" : 1
-		},
-		{
-			"backtrace" : 1,
-			"path" : "bounded_plane.h",
-			"sourceGroupIndex" : 1
-		},
-		{
-			"backtrace" : 1,
-			"path" : "cube.h",
 			"sourceGroupIndex" : 1
 		},
 		{
@@ -189,6 +166,11 @@
 		{
 			"backtrace" : 1,
 			"path" : "obj_loader.h",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "bvh_builder.h",
 			"sourceGroupIndex" : 1
 		}
 	],

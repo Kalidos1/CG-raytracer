@@ -9,12 +9,11 @@ add_executable(raytracer main.cpp
         hittable.h
         material.h
         ray.h
-        sphere.h
         triangle.h
-        plane.h
         mat3.h
-        bounded_plane.h
-        cube.h
         light.h
         bounding_box.h
-        obj_loader.h)
+        obj_loader.h
+        bvh_builder.h
+        bvh_builder.h
+        bvh_builder.h)
