@@ -31,6 +31,23 @@ public:
     apply_view_transform(const vec3 &translation, const vec3 &rotation, double angle, const point3 &cam) = 0;
 
     [[nodiscard]] virtual BoundingBox get_bounding_box() const = 0;
-};
 
+    [[nodiscard]] virtual vec3 get_v0() const = 0;
+
+    [[nodiscard]] virtual vec3 get_v1() const = 0;
+
+    [[nodiscard]] virtual vec3 get_v2() const = 0;
+
+    [[nodiscard]] virtual vec3
+    calculate_barycentric_coordinates(const vec3 &p) const = 0;
+
+    [[nodiscard]] virtual double interpolate_coordinate_1(const vec3 &barycentric) const = 0;
+
+    [[nodiscard]] virtual double interpolate_coordinate_2(const vec3 &barycentric) const = 0;
+
+    [[nodiscard]] virtual double area() const = 0;
+
+    [[nodiscard]] virtual double volume() const = 0;
+
+};
 #endif //HITTABLE_H

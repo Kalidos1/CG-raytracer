@@ -7,10 +7,14 @@
 
 class Triangle : public Hittable {
 public:
-    Triangle(const vec3 &_v0, const vec3 &_v1, const vec3 &_v2, const color &_triangle_color,
+    Triangle(const vec3 &_v0, const vec3 &_v1, const vec3 &_v2, const double _uv0[2], const double _uv1[2],
+             const double _uv2[2], const color &_triangle_color,
              const std::shared_ptr<Material> &material) : v0(_v0),
                                                           v1(_v1),
                                                           v2(_v2),
+                                                          uv0{_uv0[0], _uv0[1]},
+                                                          uv1{_uv1[0], _uv1[1]},
+                                                          uv2{_uv2[0], _uv2[1]},
                                                           Hittable(_triangle_color, material) {
     }
 
@@ -102,8 +106,62 @@ public:
         return degrees * M_PI / 180.0;
     }
 
+    [[nodiscard]] vec3 get_v0() const override {
+        return v0;
+    }
+
+    [[nodiscard]] vec3 get_v1() const override {
+        return v1;
+    }
+
+    [[nodiscard]] vec3 get_v2() const override {
+        return v2;
+    }
+
+    [[nodiscard]] vec3
+    calculate_barycentric_coordinates(const vec3 &p) const override {
+        vec3 v_0 = v1 - v0;
+        vec3 v_1 = v2 - v0;
+        vec3 v_2 = p - v0;
+
+        double d00 = dot(v_0, v_0);
+        double d01 = dot(v_0, v_1);
+        double d11 = dot(v_1, v_1);
+        double d20 = dot(v_2, v_0);
+        double d21 = dot(v_2, v_1);
+
+        double denom = d00 * d11 - d01 * d01;
+        double v_temp = (d11 * d20 - d01 * d21) / denom;
+        double w = (d00 * d21 - d01 * d20) / denom;
+        double u_temp = 1.0 - v_temp - w;
+
+        return {u_temp, v_temp, w};
+    }
+
+    [[nodiscard]] double interpolate_coordinate_1(const vec3 &barycentric) const override {
+        return uv0[0] * barycentric.x() + uv1[0] * barycentric.y() + uv2[0] * barycentric.z();
+    }
+
+    [[nodiscard]] double interpolate_coordinate_2(const vec3 &barycentric) const override {
+        return uv0[1] * barycentric.x() + uv1[1] * barycentric.y() + uv2[1] * barycentric.z();
+    }
+
+    [[nodiscard]] double area() const override {
+        vec3 edge1 = v1 - v0;
+        vec3 edge2 = v2 - v0;
+        vec3 cross_product = cross(edge1, edge2);
+        return 0.5 * cross_product.length();
+    }
+
+    [[nodiscard]] double volume() const override {
+        return std::abs(v0.x() * (v1.y() * v2.z() - v1.z() * v2.y()) -
+                        v0.y() * (v1.x() * v2.z() - v1.z() * v2.x()) +
+                        v0.z() * (v1.x() * v2.y() - v1.y() * v2.x())) / 6.0;
+    }
+
 private:
     vec3 v0, v1, v2;
+    double uv0[2], uv1[2], uv2[2];
 
     void apply_translation(const vec3 &translation) {
         v0 += translation;

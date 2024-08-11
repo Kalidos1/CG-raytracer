@@ -14,6 +14,10 @@
 #include "obj_loader.h"
 #include "bvh_builder.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+
+#include "stb_image.h"
+
 #include <chrono>
 #include <filesystem>
 #include <algorithm>
@@ -61,18 +65,23 @@ double gammaCorrect(const double color_value) {
 }
 
 bool occluded(const std::shared_ptr<Light> &light, const vec3 &hit_point,
-              const std::vector<std::shared_ptr<Hittable>> &hittables,
-              double t) {
+              std::vector<std::shared_ptr<Hittable>> &hittables,
+              double t, BVHBuilder bvhBuilder) {
     //Calculate light direction and shadow ray (From hitpoint to light source)
     const vec3 light_direction = unit_vector(light->origin - hit_point);
     Ray shadow_ray(hit_point, light_direction);
 
-    // Check if the shadow ray intersects with any object
-    for (const auto &hittable: hittables) {
+    int hit_object = -1;
+
+    bvhBuilder.intersect_bvh(shadow_ray, hittables, hit_object);
+
+    if (hit_object != -1 && shadow_ray.t < std::numeric_limits<double>::max()) {
+        const std::shared_ptr<Hittable> &hitObject = hittables[hit_object];
+
         // Check if the shadow ray intersects with the object
         // If the distance from the hit point -> Intersection point is greater than hit point
         // -> Light source than we do not consider this point because it is technically behind the light
-        if (hittable->intersect(shadow_ray) && t < (light->origin - hit_point).length()) {
+        if (hitObject->intersect(shadow_ray) && t < (light->origin - hit_point).length()) {
             // Check if the intersection point is on the same object
             const vec3 intersection_point = shadow_ray.origin + shadow_ray.direction * t;
             if ((intersection_point - hit_point).length() > 1e-6) return true;
@@ -86,7 +95,6 @@ vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
            const std::vector<std::shared_ptr<Light>> &lights,
            const int depth, BVHBuilder bvhBuilder) {
     if (depth <= 0) {
-        // Maximum recursion depth reached, return background color
         return {0.7, 0.8, 1.0};
     }
 
@@ -103,10 +111,12 @@ vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
 //    }
 
     if (hit_object != -1 && ray.t < std::numeric_limits<double>::max()) {
+        //return {0.2, 0.6, 0.1};
         const std::shared_ptr<Hittable> &hitObject = hittables[hit_object];
 
         // Calculate the hit point and normal of the object
-        const vec3 hit_point = ray.origin + ray.direction * ray.t;
+        const vec3 hit_point = (ray.origin + ray.direction * ray.t);
+        const vec3 barycentric = hitObject->calculate_barycentric_coordinates(hit_point);
         const vec3 normal = hitObject->calculate_normal(hit_point, ray);
 
         color hit_color = color(0, 0, 0);
@@ -119,18 +129,20 @@ vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
 //                return trace(reflected_ray, hittables, lights, depth - 1);
 //            }
 
+            // Interpolate texture coordinates
+            double interpolated_uv[2] = {hitObject->interpolate_coordinate_1(barycentric),
+                                         hitObject->interpolate_coordinate_2(barycentric)};
+
             shade_color = hitObject->material->shade(light, hit_point, ray,
-                                                     normal, hitObject->object_color);
+                                                     normal, hitObject->object_color, interpolated_uv);
 
 
-            if (occluded(light, hit_point, hittables, ray.t)) {
+            if (occluded(light, hit_point, hittables, ray.t, bvhBuilder)) {
                 shade_color *= 0.7;
                 hit_color += shade_color;
             } else {
                 hit_color += shade_color;
             }
-
-            hit_color += shade_color;
         }
 
         // Apply tone mapping
@@ -152,6 +164,26 @@ vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
     return {0.7, 0.8, 1.0};
 }
 
+// Function to load a texture
+unsigned char *load_texture(const std::string &filepath, int &width, int &height, int &channels) {
+    unsigned char *data = stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb);
+    if (!data) {
+        std::cerr << "Failed to load texture image at path: " << filepath << std::endl;
+        throw std::runtime_error("Failed to load texture image");
+    }
+    channels = 3; // Set channels to 3 to avoid calculation discrepancies
+    return data;
+}
+
+/*
+ * TODO:
+ * 1. Fix Linear SAH
+ * 2. Make some speed up versions of SAH and the intersection method
+ * 3. Implement Uniform Grid
+ * 4. Maybe check out some other implementation that could be cool
+ * 5. Check all things and make some overall improvements
+ */
+
 void render(const int files) {
     for (int i = 0; i <= files; i++) {
         // Open file to save image
@@ -164,15 +196,16 @@ void render(const int files) {
         const int image_height = 800;
 
         // Camera
-        point3 camera = point3(0, 0, 10);
-        vec3 camera_direction = vec3(0, 0, -1);
+        point3 camera = point3(0, 0.1, 0.25);
+        // Avoid floating point arithmetics
+        vec3 camera_direction = vec3(1e-10, 1e-10, 1e-10 + -1);
 
         // Lights
         color white = color(1, 1, 1);
-        Light light = Light(white, point3(0, 13, 15), vec3(0, 0, 0), 9);
+        Light light = Light(white, point3(25, 20, -10), vec3(0, 0, 0), 3);
 
         //Materials
-        auto phong_material = std::make_shared<PhongMaterial>(5);
+        //auto phong_material = std::make_shared<PhongMaterial>(5);
         auto lambertian_material = std::make_shared<LambertianMaterial>();
         auto checkered_material = std::make_shared<
                 CheckeredMaterial>(5, color(0.7, 0.7, 0.7), color(0.3, 0.3, 0.3));
@@ -184,22 +217,18 @@ void render(const int files) {
 
         //hittables.reserve(number_of_triangles);
 
-//        for (int j = 0; j < number_of_triangles; j++) {
-//            auto r0 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
-//            auto r1 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
-//            auto r2 = vec3(std::rand() % 10 + (-5), std::rand() % 10 + (-5), std::rand() % 10 + (-5));
-//
-//            auto vertex0 = (r0 * 9) - vec3(5, 5, 5);
-//
-//            hittables.emplace_back(
-//                    std::make_shared<Triangle>(vertex0, vertex0 + r1, vertex0 + r2, color(1, 1, 0),
-//                                               lambertian_material));
-//        }
+        //Load texture
+        std::string filename_image = "obj_files/fabric.png";
+        std::filesystem::path filepath_image = std::filesystem::current_path().parent_path() / filename_image;
+        int texture_width, texture_height, texture_channels;
+        unsigned char *texture_data = load_texture(filepath_image.string(), texture_width, texture_height,
+                                                   texture_channels);
 
         // Get filename in subfolder
-        std::string filename = "obj_files/teapot.obj";
+        std::string filename = "obj_files/dragon.obj";
         std::filesystem::path filepath = std::filesystem::current_path().parent_path() / filename;
         std::cout << "Attempting to open file: " << filepath << std::endl;
+
 
         // Create the obj. loader from https://github.com/Bly7/OBJ-Loader
         objl::Loader loader;
@@ -223,8 +252,28 @@ void render(const int files) {
                     vec3 v3(currentMesh.Vertices[idx3].Position.X, currentMesh.Vertices[idx3].Position.Y,
                             currentMesh.Vertices[idx3].Position.Z);
 
+                    const double texture_v0[2] = {currentMesh.Vertices[idx1].TextureCoordinate.X,
+                                                  currentMesh.Vertices[idx1].TextureCoordinate.Y};
+                    const double texture_v1[2] = {currentMesh.Vertices[idx2].TextureCoordinate.X,
+                                                  currentMesh.Vertices[idx2].TextureCoordinate.Y};
+                    const double texture_v2[2] = {currentMesh.Vertices[idx3].TextureCoordinate.X,
+                                                  currentMesh.Vertices[idx3].TextureCoordinate.Y};
+
+                    const color ambient_color = {currentMesh.MeshMaterial.Ka.X, currentMesh.MeshMaterial.Ka.Y,
+                                                 currentMesh.MeshMaterial.Ka.Z};
+                    const color diffuse_color = {currentMesh.MeshMaterial.Kd.X, currentMesh.MeshMaterial.Kd.Y,
+                                                 currentMesh.MeshMaterial.Kd.Z};
+                    const color specular_color = {currentMesh.MeshMaterial.Ks.X, currentMesh.MeshMaterial.Ks.Y,
+                                                  currentMesh.MeshMaterial.Ks.Z};
+
+                    auto phong_material_test = std::make_shared<PhongMaterial>(32, texture_data, texture_width,
+                                                                               texture_height, texture_channels,
+                                                                               ambient_color, diffuse_color,
+                                                                               specular_color);
+
                     // Create the triangle
-                    Triangle triangle(v1, v2, v3, color(1, 1, 0), lambertian_material);
+                    Triangle triangle(v1, v2, v3, texture_v0, texture_v1, texture_v2, color(0.7, 0.2, 0.2),
+                                      phong_material_test);
 
                     // first vertex coordinates -> Update min and mx by comparing them -> Min smaller -> Max larger
                     // Calculate center -> sum up all vertex coordinates -> divide the sum of x y and z by total number of vertices
@@ -252,17 +301,17 @@ void render(const int files) {
 
         // Transform camera -> Move all objects as if we would move the camera
         for (const auto &object: hittables) {
-            //object->apply_view_transform(vec3(0, 0, 0), rotation_vector, 20, camera);
+            //object->apply_view_transform(vec3(0, 0, 0), rotation_vector, 90, camera);
         }
 
         // Make transform to light to simulate camera movement
-//        light.apply_view_transform(vec3(0, 0, 0), rotation_vector, 20);
+        //light.apply_view_transform(vec3(0, 0, 0), rotation_vector, 45);
         // Create the light plane which simulates 3x3 light
         const std::vector<std::shared_ptr<Light>> lights = light.createPlaneLight();
 
         auto startBVH = high_resolution_clock::now();
 
-        BVHBuilder bvhBuilder = *new BVHBuilder(hittables.size());
+        BVHBuilder bvhBuilder = *new BVHBuilder(hittables.size(), Split::Linear);
         bvhBuilder.build_bvh(hittables);
 
         auto stopBVH = high_resolution_clock::now();
@@ -288,7 +337,7 @@ void render(const int files) {
 //                        const double v = (image_height / 2 - j - 0.5 - sy * 0.5) / image_height;
 //
 //                        Ray ray(camera, camera_direction + vec3(u, v, 0));
-//                        pixel_color = pixel_color + trace(ray, hittables, lights, 1, rootNodeIdx);
+//                        pixel_color = pixel_color + trace(ray, hittables, lights, 1, bvhBuilder);
 //                    }
 //                }
 
@@ -306,11 +355,13 @@ void render(const int files) {
         auto durationPixel = duration_cast<microseconds>(stopPixel - startPixel);
 
         std::cout << "\nTime taken by BVH construction: "
-                  << durationBVH.count() << " microseconds" << std::endl;
+                << durationBVH.count() / 1000 << " milliseconds" << std::endl;
 
         std::cout << "Time taken by tracing scene: "
-                  << durationPixel.count() << " microseconds" << std::endl;
+                << durationPixel.count() / 1000 << " milliseconds" << std::endl;
 
+
+        stbi_image_free(texture_data);
         myFile.close();
     }
 }
@@ -324,5 +375,5 @@ int main() {
     auto duration = duration_cast<microseconds>(stop - start);
 
     std::cout << "Time taken total: "
-              << duration.count() << " microseconds" << std::endl;
+            << duration.count() / 1000 << " milliseconds" << std::endl;
 }
