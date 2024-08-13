@@ -13,6 +13,7 @@
 #include "light.h"
 #include "obj_loader.h"
 #include "bvh_builder.h"
+#include "uniform_grid.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -66,14 +67,14 @@ double gammaCorrect(const double color_value) {
 
 bool occluded(const std::shared_ptr<Light> &light, const vec3 &hit_point,
               std::vector<std::shared_ptr<Hittable>> &hittables,
-              double t, BVHBuilder bvhBuilder) {
+              double t, UniformGrid &uniformGrid) {
     //Calculate light direction and shadow ray (From hitpoint to light source)
     const vec3 light_direction = unit_vector(light->origin - hit_point);
     Ray shadow_ray(hit_point, light_direction);
 
     int hit_object = -1;
 
-    bvhBuilder.intersect_bvh(shadow_ray, hittables, hit_object);
+    uniformGrid.intersect(shadow_ray, hittables, hit_object);
 
     if (hit_object != -1 && shadow_ray.t < std::numeric_limits<double>::max()) {
         const std::shared_ptr<Hittable> &hitObject = hittables[hit_object];
@@ -93,15 +94,14 @@ bool occluded(const std::shared_ptr<Light> &light, const vec3 &hit_point,
 
 vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
            const std::vector<std::shared_ptr<Light>> &lights,
-           const int depth, BVHBuilder bvhBuilder) {
+           const int depth, UniformGrid &uniformGrid) {
     if (depth <= 0) {
         return {0.7, 0.8, 1.0};
     }
 
     int hit_object = -1;
 
-    bvhBuilder.intersect_bvh(ray, hittables, hit_object);
-
+    uniformGrid.intersect(ray, hittables, hit_object);
 
     //Find the nearest object intersection
 //    for (int i = 0; i < hittables.size(); ++i) {
@@ -137,7 +137,7 @@ vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
                                                      normal, hitObject->object_color, interpolated_uv);
 
 
-            if (occluded(light, hit_point, hittables, ray.t, bvhBuilder)) {
+            if (occluded(light, hit_point, hittables, ray.t, uniformGrid)) {
                 shade_color *= 0.7;
                 hit_color += shade_color;
             } else {
@@ -177,11 +177,9 @@ unsigned char *load_texture(const std::string &filepath, int &width, int &height
 
 /*
  * TODO:
- * 1. Fix Linear SAH
- * 2. Make some speed up versions of SAH and the intersection method
  * 3. Implement Uniform Grid
- * 4. Maybe check out some other implementation that could be cool
- * 5. Check all things and make some overall improvements
+ * 4. Maybe check out some other implementation that could be cool, might look at some octrees with lbvh or something
+ * 5. Check all things and make some overall improvements to code varialbes etc.
  */
 
 void render(const int files) {
@@ -196,7 +194,7 @@ void render(const int files) {
         const int image_height = 800;
 
         // Camera
-        point3 camera = point3(0, 0.1, 0.25);
+        point3 camera = point3(0, 0.15, 0.25);
         // Avoid floating point arithmetics
         vec3 camera_direction = vec3(1e-10, 1e-10, 1e-10 + -1);
 
@@ -214,15 +212,18 @@ void render(const int files) {
 
         //Objects
         std::vector<std::shared_ptr<Hittable>> hittables;
+        // MIGHT BE BETTER TO JUST USE TRIANGLES
 
         //hittables.reserve(number_of_triangles);
 
         //Load texture
-        std::string filename_image = "obj_files/fabric.png";
-        std::filesystem::path filepath_image = std::filesystem::current_path().parent_path() / filename_image;
+//        std::string filename_image = "obj_files/fabric.png";
+        //      std::filesystem::path filepath_image = std::filesystem::current_path().parent_path() / filename_image;
         int texture_width, texture_height, texture_channels;
-        unsigned char *texture_data = load_texture(filepath_image.string(), texture_width, texture_height,
-                                                   texture_channels);
+        //   unsigned char *texture_data = load_texture(filepath_image.string(), texture_width, texture_height,
+        //                                       texture_channels);
+
+        unsigned char *texture_data = nullptr;
 
         // Get filename in subfolder
         std::string filename = "obj_files/dragon.obj";
@@ -301,7 +302,7 @@ void render(const int files) {
 
         // Transform camera -> Move all objects as if we would move the camera
         for (const auto &object: hittables) {
-            //object->apply_view_transform(vec3(0, 0, 0), rotation_vector, 90, camera);
+            //object->apply_view_transform(vec3(0, 1, 0), rotation_vector, 180, camera);
         }
 
         // Make transform to light to simulate camera movement
@@ -311,14 +312,23 @@ void render(const int files) {
 
         auto startBVH = high_resolution_clock::now();
 
-        BVHBuilder bvhBuilder = *new BVHBuilder(hittables.size(), Split::Linear);
-        bvhBuilder.build_bvh(hittables);
+        //DataStructureType type = DataStructureType::Grid;
+
+        //BVHBuilder bvhBuilder = *new BVHBuilder(hittables.size(), Split::SAH);
+        //bvhBuilder.build(hittables);
+
+        UniformGrid uniformGrid = *new UniformGrid(hittables.size());
+        uniformGrid.build(hittables);
+
 
         auto stopBVH = high_resolution_clock::now();
         auto durationBVH = duration_cast<microseconds>(stopBVH - startBVH);
 
         // Render
         myFile << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+
+        // Create a vector to store all pixel colors
+        std::vector<color> pixel_colors(image_width * image_height);
 
         // Go over every pixel in image height and width
         auto startPixel = high_resolution_clock::now();
@@ -344,21 +354,26 @@ void render(const int files) {
                 const double u = static_cast<double>(k - image_width / 2) / image_width;
                 const double v = static_cast<double>(image_height / 2 - j) / image_height;
                 Ray ray(camera, camera_direction + vec3(u, v, 0));
-                pixel_color = trace(ray, hittables, lights, 2, bvhBuilder);
+                pixel_color = trace(ray, hittables, lights, 2, uniformGrid);
 
 
-                // Apply color correction and write colors to file
-                write_color(myFile, pixel_color);
+                // Apply color correction and write colors to vector
+                pixel_colors[j * image_width + k] = pixel_color;
             }
         }
         auto stopPixel = high_resolution_clock::now();
         auto durationPixel = duration_cast<microseconds>(stopPixel - startPixel);
 
+        // Write all pixel colors to file at once
+        for (const auto &pixel_color: pixel_colors) {
+            write_color(myFile, pixel_color);
+        }
+
         std::cout << "\nTime taken by BVH construction: "
-                << durationBVH.count() / 1000 << " milliseconds" << std::endl;
+                  << durationBVH.count() / 1000 << " milliseconds" << std::endl;
 
         std::cout << "Time taken by tracing scene: "
-                << durationPixel.count() / 1000 << " milliseconds" << std::endl;
+                  << durationPixel.count() / 1000 << " milliseconds" << std::endl;
 
 
         stbi_image_free(texture_data);
@@ -375,5 +390,5 @@ int main() {
     auto duration = duration_cast<microseconds>(stop - start);
 
     std::cout << "Time taken total: "
-            << duration.count() / 1000 << " milliseconds" << std::endl;
+              << duration.count() / 1000 << " milliseconds" << std::endl;
 }

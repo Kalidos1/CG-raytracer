@@ -6,8 +6,6 @@
 #include <memory>
 #include <algorithm>
 #include <queue>
-#include "vec3.h"
-#include "hittable.h"
 
 enum Split {
     Middle, SAH, Linear, LinearSAH
@@ -36,12 +34,15 @@ public:
                                                          bvhNode(new BVHNode[2 * numTriangles]), rootNodeIdx(0),
                                                          nodesUsed(1), numTriangles(numTriangles), split(split) {}
 
-    void build_bvh(const std::vector<std::shared_ptr<Hittable>> &hittables) {
+    void build(const std::vector<std::shared_ptr<Hittable>> &hittables) {
         if (split == Split::Linear) {
+            // Build BVH Bottom-Up
             build_bvh_bottom_up(hittables, 0);
         } else if (split == Split::LinearSAH) {
+            // Build BVH Bottom-Up
             build_bvh_bottom_up(hittables, 32);
         } else {
+            // Build BVH Top-Down
             for (int i = 0; i < numTriangles; i++) triIdx[i] = i;
 
             BVHNode &root = bvhNode[rootNodeIdx];
@@ -51,7 +52,7 @@ public:
         }
     }
 
-    void intersect_bvh(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) {
+    void intersect(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) {
         intersect_bvh(ray, rootNodeIdx, hittables, hit_object);
     }
 
@@ -60,17 +61,15 @@ public:
         BVHNode *node = &bvhNode[nodeIdx], *stack[64];
         int stackPtr = 0;
 
-        // Precompute inverse ray direction and direction signs
-        vec3 invDir(1.0 / ray.direction.x(), 1.0 / ray.direction.y(), 1.0 / ray.direction.z());
-        int dirIsNeg[3] = {invDir.x() < 0, invDir.y() < 0, invDir.z() < 0};
-
         while (true) {
             if (node->isLeaf()) {
                 for (int i = 0; i < node->triCount; i++) {
                     int objIndex = triIdx[node->leftFirst + i];
+                    double nearestHit = ray.t;
                     if (hittables[objIndex]->intersect(ray)) {
+                        if (ray.t < nearestHit) nearestHit = ray.t;
+                        else return; // Early termination if we already have a nearer intersection
                         hit_object = objIndex;
-                        return; // Early termination (Only get first intersection)
                     }
                 }
                 if (stackPtr == 0) break;
@@ -96,21 +95,6 @@ public:
                 if (dist2 != std::numeric_limits<double>::infinity()) stack[stackPtr++] = child2;
             }
         }
-//        BVHNode &node = bvhNode[nodeIdx];
-//        if (!node.boundingBox.intersect(ray)) return;
-//
-//        // TODO: Can be speed up if we check where the ray is going and only check there for intersections instead of on the right side aswell
-//        if (node.isLeaf()) {
-//            for (int i = 0; i < node.triCount; i++) {
-//                int objIndex = triIdx[node.leftFirst + i];
-//                if (hittables[objIndex]->intersect(ray)) {
-//                    hit_object = objIndex;
-//                }
-//            }
-//        } else {
-//            intersect_bvh(ray, node.leftFirst, hittables, hit_object);
-//            intersect_bvh(ray, node.leftFirst + 1, hittables, hit_object);
-//        }
     }
 
 private:
@@ -136,51 +120,57 @@ private:
     double find_best_split(BVHNode &node, int &axis, double &splitPos,
                            const std::vector<std::shared_ptr<Hittable>> &hittables) {
         double bestCost = 1e30f;
-        // TODO: Only check longest axis
-        for (int a = 0; a < 3; a++) {
-            double boundsMin = node.boundingBox.min[a];
-            double boundsMax = node.boundingBox.max[a];
-            if (boundsMin == boundsMax) continue;
 
-            // populate bins
-            const int number_of_intervals = 8;
-            Bin bins[number_of_intervals];
-            double scale = number_of_intervals / (boundsMax - boundsMin);
-            for (int k = 0; k < node.triCount; k++) {
-                const std::shared_ptr<Hittable> &triangle = hittables[triIdx[node.leftFirst + k]];
-                int binIdx = std::min(number_of_intervals - 1,
-                                      (int) ((triangle->calculate_center()[a] - boundsMin) * scale));
-                bins[binIdx].triCount++;
-                bins[binIdx].bounds.grow(triangle->get_v0());
-                bins[binIdx].bounds.grow(triangle->get_v1());
-                bins[binIdx].bounds.grow(triangle->get_v2());
-            }
+        // Determine the longest axis
+        vec3 diag = node.boundingBox.max - node.boundingBox.min;
+        int longestAxis = 0;
+        if (diag.y() > diag.x()) longestAxis = 1;
+        if (diag.z() > diag[longestAxis]) longestAxis = 2;
 
-            double leftArea[number_of_intervals - 1], rightArea[number_of_intervals - 1];
-            int leftCount[number_of_intervals - 1], rightCount[number_of_intervals - 1];
+        int a = longestAxis;
 
-            BoundingBox leftBox, rightBox;
-            int leftSum = 0, rightSum = 0;
-            for (int i = 0; i < number_of_intervals - 1; i++) {
-                leftSum += bins[i].triCount;
-                leftCount[i] = leftSum;
-                leftBox.grow(bins[i].bounds);
-                leftArea[i] = leftBox.area();
+        double boundsMin = node.boundingBox.min[a];
+        double boundsMax = node.boundingBox.max[a];
+        if (boundsMin == boundsMax) return bestCost;
 
-                rightSum += bins[number_of_intervals - 1 - i].triCount;
-                rightCount[number_of_intervals - 2 - i] = rightSum;
-                rightBox.grow(bins[number_of_intervals - 1 - i].bounds);
-                rightArea[number_of_intervals - 2 - i] = rightBox.area();
-            }
+        // populate bins
+        const int number_of_intervals = 8;
+        Bin bins[number_of_intervals];
+        double scale = number_of_intervals / (boundsMax - boundsMin);
+        for (int k = 0; k < node.triCount; k++) {
+            const std::shared_ptr<Hittable> &triangle = hittables[triIdx[node.leftFirst + k]];
+            int binIdx = std::min(number_of_intervals - 1,
+                                  (int) ((triangle->calculate_center()[a] - boundsMin) * scale));
+            bins[binIdx].triCount++;
+            bins[binIdx].bounds.grow(triangle->get_v0());
+            bins[binIdx].bounds.grow(triangle->get_v1());
+            bins[binIdx].bounds.grow(triangle->get_v2());
+        }
 
-            scale = (boundsMax - boundsMin) / number_of_intervals;
-            for (int i = 0; i < number_of_intervals - 1; i++) {
-                double planeCost = leftCount[i] * leftArea[i] + rightCount[i] * rightArea[i];
-                if (planeCost < bestCost) {
-                    axis = a;
-                    splitPos = boundsMin + scale * (i + 1);
-                    bestCost = planeCost;
-                }
+        double leftArea[number_of_intervals - 1], rightArea[number_of_intervals - 1];
+        int leftCount[number_of_intervals - 1], rightCount[number_of_intervals - 1];
+
+        BoundingBox leftBox, rightBox;
+        int leftSum = 0, rightSum = 0;
+        for (int i = 0; i < number_of_intervals - 1; i++) {
+            leftSum += bins[i].triCount;
+            leftCount[i] = leftSum;
+            leftBox.grow(bins[i].bounds);
+            leftArea[i] = leftBox.area();
+
+            rightSum += bins[number_of_intervals - 1 - i].triCount;
+            rightCount[number_of_intervals - 2 - i] = rightSum;
+            rightBox.grow(bins[number_of_intervals - 1 - i].bounds);
+            rightArea[number_of_intervals - 2 - i] = rightBox.area();
+        }
+
+        scale = (boundsMax - boundsMin) / number_of_intervals;
+        for (int i = 0; i < number_of_intervals - 1; i++) {
+            double planeCost = leftCount[i] * leftArea[i] + rightCount[i] * rightArea[i];
+            if (planeCost < bestCost) {
+                axis = a;
+                splitPos = boundsMin + scale * (i + 1);
+                bestCost = planeCost;
             }
         }
         return bestCost;
@@ -238,23 +228,25 @@ private:
     }
 
     static inline uint32_t expandBits(uint32_t x) {
-        x = (x | (x << 16)) & 0x30000FF;
-        x = (x | (x << 8)) & 0x300F00F;
-        x = (x | (x << 4)) & 0x30C30C3;
-        x = (x | (x << 2)) & 0x9249249;
+        if (x == (1 << 10)) --x;
+        x = (x | (x << 16)) & 0b00000011000000000000000011111111;
+        x = (x | (x << 8)) & 0b00000011000000001111000000001111;
+        x = (x | (x << 4)) & 0b00000011000011000011000011000011;
+        x = (x | (x << 2)) & 0b00001001001001001001001001001001;
         return x;
     }
 
     static inline uint32_t encodeMorton3(const vec3 &v, const BoundingBox &globalBounds, int gridResolution) {
-        // Normalize to [0, 1]
-        const vec3 normalize = (v - globalBounds.min) / (globalBounds.max - globalBounds.min);
+        // Normalize to [0, 1] inside the global bounds
+        //const vec3 normalize = (v - globalBounds.min) / (globalBounds.max - globalBounds.min);
+        const vec3 normalize = globalBounds.offset(v);
 
-        int limit = gridResolution - 1;
+        int scale = gridResolution - 1;
 
-        // Scale to [0, limit] depending on the average triangle volume
-        int x = static_cast<int>(normalize.x() * limit);
-        int y = static_cast<int>(normalize.y() * limit);
-        int z = static_cast<int>(normalize.z() * limit);
+        // Scale to [0, scale] depending on the average triangle volume
+        int x = static_cast<int>(normalize.x() * scale);
+        int y = static_cast<int>(normalize.y() * scale);
+        int z = static_cast<int>(normalize.z() * scale);
 
         return (morton3D(x, y, z));
     }
@@ -282,7 +274,8 @@ private:
     }
 
     static double calculate_sah_cost(const BVHNode &node1, const BVHNode &node2) {
-        return node1.boundingBox.area() * node1.totalTriCount + node2.boundingBox.area() * node2.totalTriCount;
+        BoundingBox combinedBB = node1.boundingBox.bb_union(node2.boundingBox);
+        return combinedBB.area() * (node1.totalTriCount + node2.totalTriCount);
     }
 
     void build_sah_nodes(int offset, int numPrimitives) {
@@ -293,6 +286,7 @@ private:
         }
 
         // Go through every node and calculate the SAH Cost of every different combination
+        // TODO: Might be better to apply same theories used at the top for this here (Bins)
         while (remainingNodes.size() > 1) {
             double bestCost = std::numeric_limits<double>::max();
             int bestFirst = -1, bestSecond = -1;
@@ -365,7 +359,7 @@ private:
         for (int i = 0; i < numTriangles; i++) {
             BoundingBox boundingBox = hittables[i]->get_bounding_box();
             primitiveBounds[i] = boundingBox;
-            globalBounds.grow(boundingBox);
+            globalBounds = globalBounds.bb_union(boundingBox);
         }
 
         const int gridResolution = determine_grid_resolution(averageTriangleVolume, globalBounds);
@@ -376,6 +370,8 @@ private:
             mortonPrims[i].mortonCode = encodeMorton3(center, globalBounds, gridResolution);
             mortonPrims[i].primitiveIndex = i;
         }
+
+        // Might be nice to check out other things but it achieves quite the nice result while being easily implemented
 
         // Sort primitives based on morton code
         std::sort(mortonPrims.begin(), mortonPrims.end(), [](const MortonPrimitive &a, const MortonPrimitive &b) {

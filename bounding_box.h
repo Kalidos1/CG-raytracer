@@ -4,10 +4,20 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
+#include "hittable.h"
 
 struct BoundingBox {
     vec3 min;
     vec3 max;
+
+    BoundingBox() {
+        int imin = std::numeric_limits<int>::min();
+        int imax = std::numeric_limits<int>::max();
+        min = vec3(imax, imax, imax);
+        max = vec3(imin, imin, imin);
+    }
+
+    BoundingBox(const vec3 &min, const vec3 &max) : min(min), max(max) {}
 
     [[nodiscard]] double intersect(Ray &ray) const {
 //        // AABB intersection with SLAB method
@@ -42,22 +52,6 @@ struct BoundingBox {
         if (tmax >= tmin && tmin < ray.t && tmax > 0) return tmin; else return std::numeric_limits<double>::infinity();
     }
 
-    // Optimized AABB intersection test
-    inline double intersectAABB(const Ray &ray, const vec3 &invDir, const int dirIsNeg[3]) {
-        vec3 tMin = (min - ray.origin) * invDir;
-        vec3 tMax = (max - ray.origin) * invDir;
-
-        if (dirIsNeg[0]) std::swap(tMin[0], tMax[0]);
-        if (dirIsNeg[1]) std::swap(tMin[1], tMax[1]);
-        if (dirIsNeg[2]) std::swap(tMin[2], tMax[2]);
-
-        double tEnter = std::max(std::max(tMin.x(), tMin.y()), tMin.z());
-        double tExit = std::min(std::min(tMax.x(), tMax.y()), tMax.z());
-
-        if (tEnter > tExit || tExit < 0) return std::numeric_limits<double>::infinity();
-        return tEnter;
-    }
-
     void grow(vec3 vector) {
         min = ::min(min, vector);
         max = ::max(max, vector);
@@ -76,14 +70,14 @@ struct BoundingBox {
     }
 
     [[nodiscard]] BoundingBox bb_union(const BoundingBox &b) const {
-        return BoundingBox(
+        return {
                 vec3(std::min(min.x(), b.min.x()),
                      std::min(min.y(), b.min.y()),
                      std::min(min.z(), b.min.z())),
                 vec3(std::max(max.x(), b.max.x()),
                      std::max(max.y(), b.max.y()),
                      std::max(max.z(), b.max.z()))
-        );
+        };
     }
 
     [[nodiscard]] vec3 center() const {
@@ -93,6 +87,14 @@ struct BoundingBox {
     [[nodiscard]] double volume() const {
         vec3 extent = max - min;
         return extent.x() * extent.y() * extent.z();
+    }
+
+    [[nodiscard]] vec3 offset(const point3 &p) const {
+        vec3 o = p - min;
+        if (max.x() > min.x()) o[0] /= max.x() - min.x();
+        if (max.y() > min.y()) o[1] /= max.y() - min.y();
+        if (max.z() > min.z()) o[2] /= max.z() - min.z();
+        return o;
     }
 };
 
