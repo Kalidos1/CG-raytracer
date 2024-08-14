@@ -4,25 +4,27 @@
 #include "vec3.h"
 #include "ray.h"
 #include "triangle.h"
-
-#include <iostream>
-#include <fstream>
-#include <vector>
-
 #include "bounding_box.h"
 #include "light.h"
 #include "obj_loader.h"
 #include "bvh_builder.h"
 #include "uniform_grid.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-
-#include "stb_image.h"
-
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <thread>
+#include <mutex>
+#include <queue>
 #include <chrono>
 #include <filesystem>
 #include <algorithm>
 #include <limits>
+
+#define STB_IMAGE_IMPLEMENTATION
+
+#include "stb_image.h"
+
 
 using namespace std::chrono;
 
@@ -30,38 +32,13 @@ using namespace std::chrono;
 double tone_map(const double hit) {
     const double L_white = 4.0;
     return hit * (1 + hit / (L_white * L_white)) / (1.0 + hit);
-    //return hit / (1.0 * hit);
-    /* Narkowicz 2015, "ACES Filmic Tone Mapping Curve"
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return (hit * (a * hit + b)) / (hit * (c * hit + d) + e);
-    */
-    /* Lottes 2016, "Advanced Techniques and Optimization of HDR Color Pipelines"
-    const float a = 1.6;
-    const float d = 0.977;
-    const float hdrMax = 8.0;
-    const float midIn = 0.18;
-    const float midOut = 0.267;
-
-    const float b =
-            (-pow(midIn, a) + pow(hdrMax, a) * midOut) /
-            ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
-    const float c =
-            (pow(hdrMax, a * d) * pow(midIn, a) - pow(hdrMax, a) * pow(midIn, a * d) * midOut) /
-            ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
-
-    return pow(hit, a) / (pow(hit, a * d) * b + c);
-    */
 }
 
 double gammaCorrect(const double color_value) {
     if (color_value <= 0.0) {
         return 0.0;
     }
-    // 2.2 = Standard gamma correction value
+    // Standard gamma correction value
     return std::pow(color_value, 2.2);
 }
 
@@ -111,7 +88,6 @@ vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
 //    }
 
     if (hit_object != -1 && ray.t < std::numeric_limits<double>::max()) {
-        //return {0.2, 0.6, 0.1};
         const std::shared_ptr<Hittable> &hitObject = hittables[hit_object];
 
         // Calculate the hit point and normal of the object
@@ -177,10 +153,54 @@ unsigned char *load_texture(const std::string &filepath, int &width, int &height
 
 /*
  * TODO:
- * 3. Implement Uniform Grid
  * 4. Maybe check out some other implementation that could be cool, might look at some octrees with lbvh or something
- * 5. Check all things and make some overall improvements to code varialbes etc.
+ * 5. Check all things and make some overall improvements to code variables etc. -> Sort code very important!!!!
+ * 6. Check why Linear and BVHs are all quite slower than Grid
+ * 7. Make some images to show how different volumes are constructed
  */
+
+
+
+// Define a Tile structure
+struct Tile {
+    int start_x, start_y, end_x, end_y;
+};
+
+// Function to render a single tile
+void
+renderTile(const Tile &tile, std::vector<color> &pixel_colors, point3 camera, vec3 camera_direction, int image_width,
+           int image_height, std::vector<std::shared_ptr<Hittable>> &hittables,
+           const std::vector<std::shared_ptr<Light>> &lights,
+           UniformGrid &uniformGrid, bool supersampling) {
+    for (int j = tile.start_y; j < tile.end_y; ++j) {
+        std::clog << "\rScanlines remaining: " << image_height - j << ' ' << std::flush;
+        for (int k = tile.start_x; k < tile.end_x; ++k) {
+            if (supersampling) {
+                color pixel_color;
+                for (int sy = 0; sy < 2; ++sy) {
+                    for (int sx = 0; sx < 2; ++sx) {
+                        // Get values between 0 and 1 to normalize coords
+                        // -> Does allow mapping of pixels to point on the image regardless of resolution
+                        const double u = (k - image_width / 2 + 0.5 + sx * 0.5) / image_width;
+                        const double v = (image_height / 2 - j - 0.5 - sy * 0.5) / image_height;
+
+                        Ray ray(camera, camera_direction + vec3(u, v, 0));
+                        pixel_color = pixel_color + trace(ray, hittables, lights, 2, uniformGrid);
+                    }
+                }
+                pixel_colors[j * image_width + k] = pixel_color * 0.25;
+            } else {
+                const double u = static_cast<double>(k - image_width / 2) / image_width;
+                const double v = static_cast<double>(image_height / 2 - j) / image_height;
+                Ray ray(camera, camera_direction + vec3(u, v, 0));
+                color pixel_color = trace(ray, hittables, lights, 2, uniformGrid);
+
+                // Apply color correction and write colors to vector
+                pixel_colors[j * image_width + k] = pixel_color;
+            }
+        }
+    }
+}
 
 void render(const int files) {
     for (int i = 0; i <= files; i++) {
@@ -232,8 +252,10 @@ void render(const int files) {
 
 
         // Create the obj. loader from https://github.com/Bly7/OBJ-Loader
+        auto startLoadingObj = high_resolution_clock::now();
         objl::Loader loader;
         bool loaded = loader.LoadFile(filepath);
+        // Go over every pixel in image height and width
         if (loaded) {
             std::vector<Triangle> triangles;
 
@@ -291,6 +313,8 @@ void render(const int files) {
                 hittables.emplace_back(std::make_shared<Triangle>(triangle));
             }
         }
+        auto stopLoadingObj = high_resolution_clock::now();
+        auto durationLoadingObj = duration_cast<microseconds>(stopLoadingObj - startLoadingObj);
 
         // Transform objects with model transform
 //        for (const auto &object: hittables) {
@@ -312,9 +336,7 @@ void render(const int files) {
 
         auto startBVH = high_resolution_clock::now();
 
-        //DataStructureType type = DataStructureType::Grid;
-
-        //BVHBuilder bvhBuilder = *new BVHBuilder(hittables.size(), Split::SAH);
+        //BVHBuilder bvhBuilder = *new BVHBuilder(hittables.size(), Split::Linear);
         //bvhBuilder.build(hittables);
 
         UniformGrid uniformGrid = *new UniformGrid(hittables.size());
@@ -332,48 +354,73 @@ void render(const int files) {
 
         // Go over every pixel in image height and width
         auto startPixel = high_resolution_clock::now();
-        for (int j = 0; j < image_height; ++j) {
-            std::clog << "\rScanlines remaining: " << image_height - j << ' ' << std::flush;
-            for (int k = 0; k < image_width; ++k) {
-                color pixel_color;
-                // 4x supersampling
-                // Cast multiple rays through different sub-pixel locations within the pixel (Make each pixel into 4 parts)
-                // Average the colors obtained from these 4 rays to get the final pixel color
-//                for (int sy = 0; sy < 2; ++sy) {
-//                    for (int sx = 0; sx < 2; ++sx) {
-//                        // Get values between 0 and 1 to normalize coords
-//                        // -> Does allow mapping of pixels to point on the image regardless of resolution
-//                        const double u = (k - image_width / 2 + 0.5 + sx * 0.5) / image_width;
-//                        const double v = (image_height / 2 - j - 0.5 - sy * 0.5) / image_height;
-//
-//                        Ray ray(camera, camera_direction + vec3(u, v, 0));
-//                        pixel_color = pixel_color + trace(ray, hittables, lights, 1, bvhBuilder);
-//                    }
-//                }
+        // Create a queue of tiles
+        std::queue<Tile> tileQueue;
 
-                const double u = static_cast<double>(k - image_width / 2) / image_width;
-                const double v = static_cast<double>(image_height / 2 - j) / image_height;
-                Ray ray(camera, camera_direction + vec3(u, v, 0));
-                pixel_color = trace(ray, hittables, lights, 2, uniformGrid);
-
-
-                // Apply color correction and write colors to vector
-                pixel_colors[j * image_width + k] = pixel_color;
+        const int tileSize = 32;
+        for (int y = 0; y < image_height; y += tileSize) {
+            for (int x = 0; x < image_width; x += tileSize) {
+                tileQueue.push({x, y,
+                                std::min(x + tileSize, image_width),
+                                std::min(y + tileSize, image_height)});
             }
         }
+
+        // Create a mutex to protect the queue
+        std::mutex queueMutex;
+
+        // Function for worker threads
+        auto worker = [&]() {
+            while (true) {
+                Tile tile;
+                {
+                    std::lock_guard<std::mutex> lock(queueMutex);
+                    if (tileQueue.empty()) break;
+                    tile = tileQueue.front();
+                    tileQueue.pop();
+                }
+                renderTile(tile, pixel_colors, camera, camera_direction, image_width, image_height, hittables, lights,
+                           uniformGrid, false);
+            }
+        };
+
+        // Determine number of threads
+        unsigned int threadCount = std::thread::hardware_concurrency();
+
+        // Create and start threads
+        std::vector<std::thread> threads;
+        for (unsigned int p = 0; p < threadCount; ++p) {
+            threads.emplace_back(worker);
+        }
+
+        // Wait for all threads to finish
+        for (auto &thread: threads) {
+            thread.join();
+        }
+
         auto stopPixel = high_resolution_clock::now();
         auto durationPixel = duration_cast<microseconds>(stopPixel - startPixel);
 
+        // Go over every pixel in image height and width
+        auto startWritingToFile = high_resolution_clock::now();
         // Write all pixel colors to file at once
         for (const auto &pixel_color: pixel_colors) {
             write_color(myFile, pixel_color);
         }
+        auto stopWritingToFile = high_resolution_clock::now();
+        auto durationWritingToFile = duration_cast<microseconds>(stopWritingToFile - startWritingToFile);
+
+        std::cout << "Time taken loading obj: "
+                  << durationLoadingObj.count() / 1000 << " milliseconds" << std::endl;
 
         std::cout << "\nTime taken by BVH construction: "
                   << durationBVH.count() / 1000 << " milliseconds" << std::endl;
 
         std::cout << "Time taken by tracing scene: "
                   << durationPixel.count() / 1000 << " milliseconds" << std::endl;
+
+        std::cout << "Time taken by writing buffer to file: "
+                  << durationWritingToFile.count() / 1000 << " milliseconds" << std::endl;
 
 
         stbi_image_free(texture_data);

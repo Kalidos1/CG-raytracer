@@ -3,20 +3,25 @@
 
 #include <vector>
 
-struct GridCell {
-    int start;  // Start index in the object list
-    int numTriangles;  // Number of objects in this cell
+enum class GridType {
+    Compact, Hashed
 };
 
 class UniformGrid {
 public:
-    explicit UniformGrid(int numTriangles) : gridDimensions(vec3(0, 0, 0)),
-                                             cellSize(vec3(0, 0, 0)), grid(),
-                                             objectList(numTriangles), sceneBounds() {}
+    explicit UniformGrid(int numTriangles, GridType type = GridType::Compact) : gridDimensions(vec3(0, 0, 0)),
+                                                                                cellSize(vec3(0, 0, 0)), gridCells(),
+                                                                                objectList(numTriangles),
+                                                                                sceneBounds(), gridType(type),
+                                                                                totalCells(0) {}
 
     void build(const std::vector<std::shared_ptr<Hittable>> &hittables) {
         createGrid(hittables);
-        buildCompactGrid(hittables);
+        if (gridType == GridType::Compact) {
+            buildCompactGrid(hittables);
+        } else {
+            buildHashedGrid(hittables);
+        }
     }
 
     void intersect(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) {
@@ -47,26 +52,38 @@ public:
         double tDeltaY = std::abs(invDir.y());
         double tDeltaZ = std::abs(invDir.z());
 
-        // Initialize p (linear array index)
-        int p = x + y * gridDimensions.x() + z * gridDimensions.x() * gridDimensions.y();
-        int px = 1;
-        int py = gridDimensions.x();
-        int pz = gridDimensions.x() * gridDimensions.y();
-
         while (x >= 0 && x < gridDimensions.x() &&
                y >= 0 && y < gridDimensions.y() &&
                z >= 0 && z < gridDimensions.z()) {
 
 
-            // Check for intersection in current cell
-            const GridCell &cell = grid[p];
-            for (int i = 0; i < cell.numTriangles; ++i) {
-                int obj_index = objectList[cell.start + i];
-                double nearestHit = ray.t;
-                if (hittables[obj_index]->intersect(ray)) {
-                    if (ray.t < nearestHit) nearestHit = ray.t;
-                    else return; // Early termination if we already have a nearer intersection
-                    hit_object = obj_index;
+            if (gridType == GridType::Compact) {
+                // Use compact grid
+                int cellIndex = static_cast<int>(x + y * gridDimensions.x() +
+                                                 z * gridDimensions.x() * gridDimensions.y());
+
+                for (int j = gridCells[cellIndex]; j < gridCells[cellIndex + 1]; ++j) {
+                    int objIndex = objectList[j];
+                    double nearestHit = ray.t;
+                    if (hittables[objIndex]->intersect(ray)) {
+                        if (ray.t < nearestHit) nearestHit = ray.t;
+                        else return; // Early termination if we already have a nearer intersection
+                        hit_object = objIndex;
+                    }
+                }
+            } else {
+                // Use hashed grid
+                vec3 cellCenter = sceneBounds.min + vec3(x + 0.5, y + 0.5, z + 0.5) * cellSize;
+                int hashIndex = hashFunction(cellCenter);
+                const std::vector<int> &objectsInCell = hashTable[hashIndex];
+
+                for (int obj_index: objectsInCell) {
+                    double nearestHit = ray.t;
+                    if (hittables[obj_index]->intersect(ray)) {
+                        if (ray.t < nearestHit) nearestHit = ray.t;
+                        else return; // Early termination if we already have a nearer intersection
+                        hit_object = obj_index;
+                    }
                 }
             }
 
@@ -74,29 +91,31 @@ public:
             if (tMaxX < tMaxY && tMaxX < tMaxZ) {
                 x += stepX;
                 tMaxX += tDeltaX;
-                p += stepX * px;
             } else if (tMaxY < tMaxZ) {
                 y += stepY;
                 tMaxY += tDeltaY;
-                p += stepY * py;
             } else {
                 z += stepZ;
                 tMaxZ += tDeltaZ;
-                p += stepZ * pz;
             }
         }
     }
 
 private:
-    vec3 gridDimensions;
-    vec3 cellSize;
-    std::vector<GridCell> grid;
-    std::vector<int> objectList;
+    vec3 gridDimensions, cellSize;
+    int totalCells;
+    GridType gridType;
     BoundingBox sceneBounds;
 
-    void createGrid(const std::vector<std::shared_ptr<Hittable>> &hittables) {
-        //TODO: Same as the morton codes -> Calculate average triangle size
+    // Compact Grid
+    std::vector<int> objectList;
+    std::vector<int> gridCells;
 
+    // Hashed Grid
+    std::vector<std::vector<int>> hashTable;
+
+
+    void createGrid(const std::vector<std::shared_ptr<Hittable>> &hittables) {
         // Calculate global bounding box
         sceneBounds = calculateSceneBounds(hittables);
 
@@ -112,8 +131,12 @@ private:
 
         // Create empty grid with everything 0, 0
         cellSize = boundingBoxSize / gridDimensions;
-        int totalCells = gridDimensions.x() * gridDimensions.y() * gridDimensions.z();
-        grid.resize(totalCells, {0, 0});
+        totalCells = gridDimensions.x() * gridDimensions.y() * gridDimensions.z();
+        if (gridType == GridType::Compact) {
+            gridCells.resize(totalCells + 1, 0);
+        } else {
+            hashTable.resize(nextPrime(totalCells));
+        }
     }
 
     void buildCompactGrid(const std::vector<std::shared_ptr<Hittable>> &hittables) {
@@ -121,44 +144,48 @@ private:
         for (const auto &hittable: hittables) {
             std::vector<int> overlappingCells = getOverlappingCells(hittable->get_bounding_box());
             for (int cellIndex: overlappingCells) {
-                grid[cellIndex].numTriangles++;
+                gridCells[cellIndex]++;
             }
         }
 
         // Compute offsets
-        int totalObjects = 0;
-        for (int i = 0; i < grid.size(); ++i) {
-            int count = grid[i].numTriangles;
-            grid[i].start = totalObjects;
-            totalObjects += count;
-            grid[i].numTriangles = 0;  // Reset count for the second pass
+        for (int i = 1; i <= totalCells; ++i) {
+            gridCells[i] += gridCells[i - 1];
         }
 
         // Allocate object list
-        objectList.resize(totalObjects);
+        objectList.resize(gridCells[totalCells]);
 
-        // Second pass: fill object list
-        for (int i = 0; i < hittables.size(); i++) {
+        // Fill object list with corresponding indexes
+        for (int i = hittables.size() - 1; i >= 0; --i) {
             std::vector<int> overlappingCells = getOverlappingCells(hittables[i]->get_bounding_box());
             for (int cellIndex: overlappingCells) {
-                int index = grid[cellIndex].start + grid[cellIndex].numTriangles;
-                objectList[index] = i;
-                grid[cellIndex].numTriangles++;
+                objectList[--gridCells[cellIndex]] = i;
             }
         }
     }
 
     std::vector<int> getOverlappingCells(const BoundingBox &box) {
+        // Minimum cell and maximum cell that we intersect with our box
         vec3 minCell = (box.min - sceneBounds.min) / cellSize;
         vec3 maxCell = (box.max - sceneBounds.min) / cellSize;
 
+        // Create variables -> Ensure that we are inside the bounds of the cell
+        // Go in every direction and count every cell that we go through
         std::vector<int> cells;
-        for (int x = std::max(0, static_cast<int>(minCell.x()));
-             x <= std::min(static_cast<int>(gridDimensions.x()) - 1, static_cast<int>(maxCell.x())); x++) {
-            for (int y = std::max(0, static_cast<int>(minCell.y()));
-                 y <= std::min(static_cast<int>(gridDimensions.y()) - 1, static_cast<int>(maxCell.y())); y++) {
-                for (int z = std::max(0, static_cast<int>(minCell.z()));
-                     z <= std::min(static_cast<int>(gridDimensions.z()) - 1, static_cast<int>(maxCell.z())); z++) {
+        // x direction
+        int minRangeX = std::max(0, static_cast<int>(minCell.x()));
+        int maxRangeX = std::min(static_cast<int>(gridDimensions.x()) - 1, static_cast<int>(maxCell.x()));
+        // y direction
+        int minRangeY = std::max(0, static_cast<int>(minCell.y()));
+        int maxRangeY = std::min(static_cast<int>(gridDimensions.y()) - 1, static_cast<int>(maxCell.y()));
+        // z direction
+        int minRangeZ = std::max(0, static_cast<int>(minCell.z()));
+        int maxRangeZ = std::min(static_cast<int>(gridDimensions.z()) - 1, static_cast<int>(maxCell.z()));
+
+        for (int x = minRangeX; x <= maxRangeX; x++) {
+            for (int y = minRangeY; y <= maxRangeY; y++) {
+                for (int z = minRangeZ; z <= maxRangeZ; z++) {
                     int index = x + y * gridDimensions.x() + z * gridDimensions.x() * gridDimensions.y();
                     cells.push_back(index);
                 }
@@ -167,8 +194,31 @@ private:
         return cells;
     }
 
+    void buildHashedGrid(const std::vector<std::shared_ptr<Hittable>> &hittables) {
+        // Go through every object in our scene and add them with the hash value to the hashTable
+        for (int i = 0; i < hittables.size(); ++i) {
+            std::vector<int> overlappingCells = getOverlappingCells(hittables[i]->get_bounding_box());
 
-    BoundingBox calculateSceneBounds(const std::vector<std::shared_ptr<Hittable>> &hittables) {
+            for (int cellIndex: overlappingCells) {
+                vec3 cellCenter = getCellCenter(cellIndex);
+                int hashIndex = hashFunction(cellCenter);
+                hashTable[hashIndex].push_back(i);
+            }
+        }
+    }
+
+    [[nodiscard]] vec3 getCellCenter(int cellIndex) const {
+        int gridX = static_cast<int>(gridDimensions.x());
+        int gridY = static_cast<int>(gridDimensions.y());
+
+        int z = cellIndex / (gridX * gridY);
+        int y = (cellIndex % (gridX * gridY)) / gridX;
+        int x = cellIndex % gridX;
+
+        return sceneBounds.min + vec3(x + 0.5, y + 0.5, z + 0.5) * cellSize;
+    }
+
+    static BoundingBox calculateSceneBounds(const std::vector<std::shared_ptr<Hittable>> &hittables) {
         BoundingBox bounds;
         int imin = std::numeric_limits<int>::min();
         int imax = std::numeric_limits<int>::max();
@@ -178,6 +228,57 @@ private:
             bounds = bounds.bb_union(hittable->get_bounding_box());
         }
         return bounds;
+    }
+
+    static int nextPrime(int n) {
+        while (true) {
+            if (isPrime(n)) return n;
+            n++;
+        }
+    }
+
+    static bool isPrime(int n) {
+        if (n <= 1) return false;
+        for (int i = 2; i * i <= n; i++) {
+            if (n % i == 0) return false;
+        }
+        return true;
+    }
+
+    [[nodiscard]] int hashFunction(const vec3 &position) const {
+        uint32_t mortonCode = encodeMorton3(position);
+        return mortonCode % totalCells;
+    }
+
+    // TODO: MORTON CODE IN EXTRA CLASS FOR BOTH STRUCTURES
+    static inline uint32_t expandBits(uint32_t x) {
+        if (x == (1 << 10)) --x;
+        x = (x | (x << 16)) & 0b00000011000000000000000011111111;
+        x = (x | (x << 8)) & 0b00000011000000001111000000001111;
+        x = (x | (x << 4)) & 0b00000011000011000011000011000011;
+        x = (x | (x << 2)) & 0b00001001001001001001001001001001;
+        return x;
+    }
+
+    [[nodiscard]] uint32_t encodeMorton3(const vec3 &v) const {
+        // Normalize to [0, 1] inside the scene bounds
+        const vec3 normalize = sceneBounds.offset(v);
+
+        int averageResolution = (gridDimensions.x() + gridDimensions.y() + gridDimensions.z()) / 3;
+
+        double scale = averageResolution - 1;
+
+        // Scale to [0, scale]
+        int x = static_cast<int>(normalize.x() * scale);
+        int y = static_cast<int>(normalize.y() * scale);
+        int z = static_cast<int>(normalize.z() * scale);
+
+        return morton3D(x, y, z);
+    }
+
+    static inline uint32_t morton3D(int x, int y, int z) {
+        return (expandBits(x) << 2) | (expandBits(y) << 1) |
+               expandBits(z);
     }
 };
 
