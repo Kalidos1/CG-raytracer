@@ -43,34 +43,34 @@ public:
         return false;
     }
 
-    [[nodiscard]] vec3 calculate_normal(const point3 &hit_point, const Ray &ray) const override {
+    [[nodiscard]] vec3 calculateNormal(const point3 &hitPoint, const Ray &ray) const override {
         // Consistent normals, use the normal of either triangle
-        return triangle1->calculate_normal(hit_point, ray);
+        return triangle1->calculateNormal(hitPoint, ray);
     }
 
-    [[nodiscard]] point3 calculate_center() const override {
+    [[nodiscard]] point3 calculateCenter() const override {
         return position;
     }
 
 
-    void apply_model_transform(const vec3 &translation, const vec3 &rotation, const vec3 &shear,
-                               const double angle, const point3 &object_center) override {
+    void applyModelTransform(const vec3 &translation, const vec3 &rotation, const vec3 &shear,
+                             const double angle, const point3 &objectCenter) override {
         // Apply the transformation to each triangle
-        triangle1->apply_model_transform(translation, rotation, shear, angle, object_center);
-        triangle2->apply_model_transform(translation, rotation, shear, angle, object_center);
+        triangle1->applyModelTransform(translation, rotation, shear, angle, objectCenter);
+        triangle2->applyModelTransform(translation, rotation, shear, angle, objectCenter);
     }
 
-    void apply_view_transform(const vec3 &translation, const vec3 &rotation, double angle,
-                              const point3 &camera) override {
+    void applyViewTransform(const vec3 &translation, const vec3 &rotation, double angle,
+                            const point3 &camera) override {
         // Apply the transformation to each triangle
-        triangle1->apply_view_transform(translation, rotation, angle, camera);
-        triangle2->apply_view_transform(translation, rotation, angle, camera);
+        triangle1->applyViewTransform(translation, rotation, angle, camera);
+        triangle2->applyViewTransform(translation, rotation, angle, camera);
     }
 
-    [[nodiscard]] BoundingBox get_bounding_box() const override {
+    [[nodiscard]] BoundingBox getBoundingBox() const override {
         // Calculate bounding boxes for each triangle
-        BoundingBox box1 = triangle1->get_bounding_box();
-        BoundingBox box2 = triangle2->get_bounding_box();
+        BoundingBox box1 = triangle1->getBoundingBox();
+        BoundingBox box2 = triangle2->getBoundingBox();
 
         // Combine these 2 boxes into one box
         BoundingBox combinedBox;

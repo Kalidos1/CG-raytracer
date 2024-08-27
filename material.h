@@ -8,72 +8,72 @@ class Material {
 public:
     virtual ~Material() = default;
 
-    [[nodiscard]] virtual color shade(const std::shared_ptr<Light>&light, const point3&hit_point, const Ray&ray,
-                                      const vec3&normal,
-                                      const color &object_color, const double interpolated_uv[2]) const = 0;
+    [[nodiscard]] virtual color shade(const std::shared_ptr<Light> &light, const point3 &hitPoint, const Ray &ray,
+                                      const vec3 &normal,
+                                      const color &objectColor, const double interpolatedUV[2]) const = 0;
 };
 
 class PhongMaterial final : public Material {
 public:
-    explicit PhongMaterial(const double _shininess, const unsigned char *texture_data, int texture_width,
-                           int texture_height, int texture_channels, color ambient_color, color diffuse_color,
+    explicit PhongMaterial(const double _shininess, const unsigned char *textureData, int textureWidth,
+                           int textureHeight, int textureChannels, color ambient_color, color diffuse_color,
                            color specular_color)
-            : shininess(_shininess), texture_data(texture_data), texture_width(texture_width),
-              texture_height(texture_height), texture_channels(texture_channels), ambient_color_temp(ambient_color),
+            : shininess(_shininess), textureData(textureData), textureWidth(textureWidth),
+              textureHeight(textureHeight), textureChannels(textureChannels), ambient_color_temp(ambient_color),
               diffuse_color_temp(diffuse_color), specular_color_temp(specular_color) {}
 
-    [[nodiscard]] color shade(const std::shared_ptr<Light>&light, const point3&hit_point, const Ray&ray,
-                              const vec3&normal,
-                              const color &object_color, const double interpolated_uv[2]) const override {
+    [[nodiscard]] color shade(const std::shared_ptr<Light> &light, const point3 &hitPoint, const Ray &ray,
+                              const vec3 &normal,
+                              const color &objectColor, const double interpolatedUV[2]) const override {
         // Calculate the normal of the object
-        const vec3 viewer_direction = unit_vector(hit_point - ray.origin);
-        const vec3 light_direction = unit_vector(light->origin - hit_point);
+        const vec3 viewerDirection = unitVector(hitPoint - ray.origin);
+        const vec3 lightDirection = unitVector(light->origin - hitPoint);
         const color white = color(1, 1, 1);
 
         // Fetch texture color
-        //color temp_color = get_texture_color(interpolated_uv);
-        color temp_color = object_color;
+        //color temp_color = get_texture_color(interpolatedUV);
+        color tempColor = objectColor;
 
         //Diffuse
-        const double diffuse_component = std::max(0.0, dot(light_direction, normal));
+        const double diffuseComponent = std::max(0.0, dot(lightDirection, normal));
 
         //Specular
-        const vec3 reflection_vector = unit_vector(normal * diffuse_component * 2 - light_direction);
-        const double specular_component = std::pow(std::max(dot(viewer_direction, -reflection_vector), 0.0), shininess);
+        const vec3 reflectionVector = unitVector(normal * diffuseComponent * 2 - lightDirection);
+        const double specularComponent = std::pow(std::max(dot(viewerDirection, -reflectionVector), 0.0), shininess);
 
         //Ambient
-        const color ambient_color = temp_color * 0.5;
+        const color ambientColor = tempColor * 0.5;
 
         //Phong Formula
-        const vec3 ambient_reflection = 1 / M_PI * ambient_color * light->intensity;
-        const vec3 surface_illumination = light->light_color * std::max(0.0, dot(light_direction, normal)) * light->
-                                          intensity;
-        const vec3 diffuse_reflection = 1 / M_PI * (temp_color) * light->intensity;
-        const vec3 specular_reflection = white * specular_component * light->intensity;
+        const vec3 ambientReflection = 1 / M_PI * ambientColor * light->intensity;
+        const vec3 surfaceIllumination = light->lightColor * std::max(0.0, dot(lightDirection, normal)) * light->
+                intensity;
+        const vec3 diffuseReflection = 1 / M_PI * (tempColor) * light->intensity;
+        const vec3 specularReflection = white * specularComponent * light->intensity;
 
-        const vec3 phong_shade = ambient_reflection + surface_illumination * (
-                                     diffuse_reflection + specular_reflection);
+        const vec3 phongShade = ambientReflection + surfaceIllumination * (
+                diffuseReflection + specularReflection);
 
-        return phong_shade;
+        return phongShade;
     }
 
     color
     get_texture_color(const double uv[2]) const {
-        int tex_x = uv[0] * (texture_width - 1);
-        int tex_y = uv[1] * (texture_height - 1);
-        tex_x = std::max(0, std::min(tex_x, texture_width - 1));
-        tex_y = std::max(0, std::min(tex_y, texture_height - 1));
+        int tex_x = uv[0] * (textureWidth - 1);
+        int tex_y = uv[1] * (textureHeight - 1);
+        tex_x = std::max(0, std::min(tex_x, textureWidth - 1));
+        tex_y = std::max(0, std::min(tex_y, textureHeight - 1));
 
-        int index = (tex_y * texture_width + tex_x) * texture_channels;
-        return {texture_data[index] / 255.0, texture_data[index + 1] / 255.0, texture_data[index + 2] / 255.0};
+        int index = (tex_y * textureWidth + tex_x) * textureChannels;
+        return {textureData[index] / 255.0, textureData[index + 1] / 255.0, textureData[index + 2] / 255.0};
     }
 
 private:
     double shininess;
-    const unsigned char *texture_data;
-    int texture_width;
-    int texture_height;
-    int texture_channels;
+    const unsigned char *textureData;
+    int textureWidth;
+    int textureHeight;
+    int textureChannels;
     color ambient_color_temp, diffuse_color_temp, specular_color_temp;
 };
 
@@ -81,38 +81,38 @@ class LambertianMaterial final : public Material {
 public:
     ~LambertianMaterial() override = default;
 
-    [[nodiscard]] color shade(const std::shared_ptr<Light>&light, const point3&hit_point, const Ray&ray,
-                              const vec3&normal,
-                              const color &object_color, const double interpolated_uv[2]) const override {
-        const vec3 light_direction = unit_vector(light->origin - hit_point);
+    [[nodiscard]] color shade(const std::shared_ptr<Light> &light, const point3 &hitPoint, const Ray &ray,
+                              const vec3 &normal,
+                              const color &objectColor, const double interpolatedUV[2]) const override {
+        const vec3 lightDirection = unitVector(light->origin - hitPoint);
 
-        const auto diffuse_component = light->light_color * std::max(0.0, dot(normal, light_direction));
-        const auto diffuse_reflection = 1 / M_PI * object_color * light->intensity;
+        const auto diffuseComponent = light->lightColor * std::max(0.0, dot(normal, lightDirection));
+        const auto diffuseReflection = 1 / M_PI * objectColor * light->intensity;
 
-        return diffuse_reflection * diffuse_component;
+        return diffuseReflection * diffuseComponent;
     }
 };
 
 class CheckeredMaterial final : public Material {
 public:
-    explicit CheckeredMaterial(const double _checkered_size, const color&_color1,
-                               const color&_color2) : size(_checkered_size), color1(_color1), color2(_color2) {
+    explicit CheckeredMaterial(const double _checkeredSize, const color &_color1,
+                               const color &_color2) : size(_checkeredSize), color1(_color1), color2(_color2) {
     }
 
-    [[nodiscard]] color shade(const std::shared_ptr<Light>&light, const point3&hit_point, const Ray&ray,
-                              const vec3&normal,
-                              const color &object_color, const double interpolated_uv[2]) const override {
-        const int square_x_coord = static_cast<int>(round(hit_point.x() / size)); // Use round to round downward
-        const int square_y_coord = static_cast<int>(round(hit_point.y() / size));
-        const int square_z_coord = static_cast<int>(round(hit_point.z() / size));
+    [[nodiscard]] color shade(const std::shared_ptr<Light> &light, const point3 &hitPoint, const Ray &ray,
+                              const vec3 &normal,
+                              const color &objectColor, const double interpolatedUV[2]) const override {
+        const int squareXCoord = static_cast<int>(round(hitPoint.x() / size)); // Use round to round downward
+        const int squareYCoord = static_cast<int>(round(hitPoint.y() / size));
+        const int squareZCoord = static_cast<int>(round(hitPoint.z() / size));
 
-        color final_color_1 = color1 * light->intensity;
-        color final_color_2 = color2 * light->intensity;
+        color finalColor1 = color1 * light->intensity;
+        color finalColor2 = color2 * light->intensity;
         // Calculate both of the cell values -> Even number C1, Odd number C2
-        if ((square_x_coord + square_y_coord + square_z_coord) % 2 == 0) {
-            return final_color_1;
+        if ((squareXCoord + squareYCoord + squareZCoord) % 2 == 0) {
+            return finalColor1;
         }
-        return final_color_2;
+        return finalColor2;
     }
 
 private:
@@ -125,12 +125,12 @@ class Mirror final : public Material {
 public:
     vec3 albedo;
 
-    explicit Mirror(const vec3&_albedo) : albedo(_albedo) {
+    explicit Mirror(const vec3 &_albedo) : albedo(_albedo) {
     }
 
-    [[nodiscard]] color shade(const std::shared_ptr<Light>&light, const point3&hit_point, const Ray&ray,
-                              const vec3&normal,
-                              const color &object_color, const double interpolated_uv[2]) const override {
+    [[nodiscard]] color shade(const std::shared_ptr<Light> &light, const point3 &hitPoint, const Ray &ray,
+                              const vec3 &normal,
+                              const color &objectColor, const double interpolatedUV[2]) const override {
         // Return background because mirror effect algorithm is insde the trace function
         return {0.7, 0.8, 1.0};
     }

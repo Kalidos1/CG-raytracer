@@ -61,7 +61,7 @@ public:
         return false;
     }
 
-    [[nodiscard]] vec3 calculate_normal(const point3 &hit_point, const Ray &ray) const override {
+    [[nodiscard]] vec3 calculateNormal(const point3 &hitPoint, const Ray &ray) const override {
         // Find the plane with the closest intersection and return its normal
         double closest_t = std::numeric_limits<double>::infinity();
         std::shared_ptr<Hittable> closest_plane = nullptr;
@@ -75,40 +75,40 @@ public:
         }
 
         if (closest_plane) {
-            return closest_plane->calculate_normal(hit_point, ray);
+            return closest_plane->calculateNormal(hitPoint, ray);
         }
 
         // Default normal -> Does not happen, results in error
         return {0, 0, 0};
     }
 
-    [[nodiscard]] point3 calculate_center() const override {
+    [[nodiscard]] point3 calculateCenter() const override {
         return center;
     }
 
     // Go through every plane and do the model transform
-    void apply_model_transform(const vec3 &translation, const vec3 &rotation, const vec3 &shear,
-                               const double angle, const point3 &object_center) override {
+    void applyModelTransform(const vec3 &translation, const vec3 &rotation, const vec3 &shear,
+                             const double angle, const point3 &objectCenter) override {
         for (const auto &plane: bounded_planes) {
-            plane->apply_model_transform(translation, rotation, shear, angle, object_center);
+            plane->applyModelTransform(translation, rotation, shear, angle, objectCenter);
         }
     }
 
     // Go through every plane and do the view transform
-    void apply_view_transform(const vec3 &translation, const vec3 &rotation, double angle,
-                              const point3 &camera) override {
+    void applyViewTransform(const vec3 &translation, const vec3 &rotation, double angle,
+                            const point3 &camera) override {
         for (const auto &plane: bounded_planes) {
-            plane->apply_view_transform(translation, rotation, angle, camera);
+            plane->applyViewTransform(translation, rotation, angle, camera);
         }
     }
 
-    [[nodiscard]] BoundingBox get_bounding_box() const override {
+    [[nodiscard]] BoundingBox getBoundingBox() const override {
         BoundingBox combinedBox;
         bool initialized = false;
 
 
         for (const auto &plane: bounded_planes) {
-            BoundingBox planeBox = plane->get_bounding_box();
+            BoundingBox planeBox = plane->getBoundingBox();
 
             // Combine bounding boxes
             if (!initialized) {

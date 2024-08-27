@@ -8,7 +8,7 @@ struct Ray {
     vec3 origin, direction;
     double t = std::numeric_limits<double>::max();
 
-    Ray(const vec3&origin, const vec3&direction) : origin(origin), direction(unit_vector(direction)) {
+    Ray(const vec3 &origin, const vec3 &direction) : origin(origin), direction(unitVector(direction)) {
     }
 };
 

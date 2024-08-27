@@ -24,24 +24,26 @@ public:
     [[nodiscard]] double z() const { return e[2]; }
 
     vec3 operator-() const { return vec3(-e[0], -e[1], -e[2]); }
-    double operator[](int i) const { return e[i]; }
-    double& operator[](int i) { return e[i]; }
 
-    vec3& operator+=(const vec3&v) {
+    double operator[](int i) const { return e[i]; }
+
+    double &operator[](int i) { return e[i]; }
+
+    vec3 &operator+=(const vec3 &v) {
         e[0] += v.e[0];
         e[1] += v.e[1];
         e[2] += v.e[2];
         return *this;
     }
 
-    vec3& operator*=(double t) {
+    vec3 &operator*=(double t) {
         e[0] *= t;
         e[1] *= t;
         e[2] *= t;
         return *this;
     }
 
-    vec3& operator/=(double t) {
+    vec3 &operator/=(double t) {
         return *this *= 1 / t;
     }
 
@@ -50,10 +52,10 @@ public:
     }
 
     [[nodiscard]] double length() const {
-        return sqrt(length_squared());
+        return sqrt(lengthSquared());
     }
 
-    [[nodiscard]] double length_squared() const {
+    [[nodiscard]] double lengthSquared() const {
         return e[0] * e[0] + e[1] * e[1] + e[2] * e[2];
     }
 };
@@ -64,27 +66,27 @@ using point3 = vec3;
 
 // Vector Utility Functions
 
-inline std::ostream& operator<<(std::ostream&out, const vec3&v) {
+inline std::ostream &operator<<(std::ostream &out, const vec3 &v) {
     return out << v.e[0] << ' ' << v.e[1] << ' ' << v.e[2];
 }
 
-inline vec3 operator+(const vec3&u, const vec3&v) {
+inline vec3 operator+(const vec3 &u, const vec3 &v) {
     return {u.e[0] + v.e[0], u.e[1] + v.e[1], u.e[2] + v.e[2]};
 }
 
-inline vec3 operator-(const vec3&u, const vec3&v) {
+inline vec3 operator-(const vec3 &u, const vec3 &v) {
     return {u.e[0] - v.e[0], u.e[1] - v.e[1], u.e[2] - v.e[2]};
 }
 
-inline vec3 operator*(const vec3&u, const vec3&v) {
+inline vec3 operator*(const vec3 &u, const vec3 &v) {
     return {u.e[0] * v.e[0], u.e[1] * v.e[1], u.e[2] * v.e[2]};
 }
 
-inline vec3 operator*(double t, const vec3&v) {
+inline vec3 operator*(double t, const vec3 &v) {
     return {t * v.e[0], t * v.e[1], t * v.e[2]};
 }
 
-inline vec3 operator*(const vec3&v, double t) {
+inline vec3 operator*(const vec3 &v, double t) {
     return t * v;
 }
 
@@ -92,24 +94,24 @@ inline vec3 operator/(vec3 v, double t) {
     return (1 / t) * v;
 }
 
-inline double dot(const vec3&u, const vec3&v) {
+inline double dot(const vec3 &u, const vec3 &v) {
     return u.e[0] * v.e[0]
            + u.e[1] * v.e[1]
            + u.e[2] * v.e[2];
 }
 
-inline vec3 cross(const vec3&u, const vec3&v) {
+inline vec3 cross(const vec3 &u, const vec3 &v) {
     return {u.e[1] * v.e[2] - u.e[2] * v.e[1],
-                u.e[2] * v.e[0] - u.e[0] * v.e[2],
+            u.e[2] * v.e[0] - u.e[0] * v.e[2],
             u.e[0] * v.e[1] - u.e[1] * v.e[0]};
 }
 
-inline vec3 unit_vector(vec3 v) {
+inline vec3 unitVector(vec3 v) {
     return v / v.length();
 }
 
 // Create a perfect mirror reflection
-inline vec3 reflect(const vec3&v, const vec3&n) {
+inline vec3 reflect(const vec3 &v, const vec3 &n) {
     return v - 2 * dot(v, n) * n;
 }
 
@@ -119,19 +121,19 @@ inline double clamp(double value, double min_val, double max_val) {
 }
 
 // Clamp vector values to a specific value range
-inline vec3 clamp(const vec3&v, double min_val, double max_val) {
+inline vec3 clamp(const vec3 &v, double min_val, double max_val) {
     return {
-        clamp(v.x(), min_val, max_val),
-        clamp(v.y(), min_val, max_val),
-        clamp(v.z(), min_val, max_val)
+            clamp(v.x(), min_val, max_val),
+            clamp(v.y(), min_val, max_val),
+            clamp(v.z(), min_val, max_val)
     };
 }
 
-double vec3_min(const vec3 &v) {
+double vecMin(const vec3 &v) {
     return std::min(v.e[0], std::min(v.e[1], v.e[2]));
 }
 
-double vec3_max(const vec3 &v) {
+double vecMax(const vec3 &v) {
     return std::max(v.e[0], std::max(v.e[1], v.e[2]));
 }
 

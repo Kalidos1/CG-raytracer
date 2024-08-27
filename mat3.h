@@ -1,5 +1,6 @@
 #ifndef MAT3_H
 #define MAT3_H
+
 #include "vec3.h"
 
 class vec3;
@@ -17,7 +18,7 @@ public:
         }
     }
 
-    mat3(const vec3&row_1, const vec3&row_2, const vec3&row_3) {
+    mat3(const vec3 &row_1, const vec3 &row_2, const vec3 &row_3) {
         //Build the matrix out of 3 vectors
         m[0][0] = row_1.x();
         m[0][1] = row_1.y();
@@ -31,7 +32,7 @@ public:
     }
 
     // Function to create a rotation matrix around the given axis (normalized vector) and angle (in radians)
-    static mat3 rotation_matrix(const vec3&axis, const double angle) {
+    static mat3 rotationMatrix(const vec3 &axis, const double angle) {
         const double c = std::cos(angle);
         const double s = std::sin(angle);
         const double t = 1.0f - c;
@@ -41,18 +42,18 @@ public:
         const double z = axis.z();
 
         return mat3{
-            {t * x * x + c, t * x * y - s * z, t * x * z + s * y},
-            {t * x * y + s * z, t * y * y + c, t * y * z - s * x},
-            {t * x * z - s * y, t * y * z + s * x, t * z * z + c}
+                {t * x * x + c,     t * x * y - s * z, t * x * z + s * y},
+                {t * x * y + s * z, t * y * y + c,     t * y * z - s * x},
+                {t * x * z - s * y, t * y * z + s * x, t * z * z + c}
         };
     }
 
     // Function to create a translation matrix
-    static mat3 translate(const vec3&translation) {
+    static mat3 translate(const vec3 &translation) {
         return mat3{
-            {1.0f, 0.0f, translation.x()},
-            {0.0f, 1.0f, translation.y()},
-            {0.0f, 0.0f, translation.z()}
+                {1.0f, 0.0f, translation.x()},
+                {0.0f, 1.0f, translation.y()},
+                {0.0f, 0.0f, translation.z()}
         };
     }
 
@@ -91,11 +92,11 @@ public:
         return result;
     }
 
-    [[nodiscard]] vec3 operator*(const vec3&v) const {
+    [[nodiscard]] vec3 operator*(const vec3 &v) const {
         return {
-            m[0][0] * v.x() + m[0][1] * v.y() + m[0][2] * v.z(),
-            m[1][0] * v.x() + m[1][1] * v.y() + m[1][2] * v.z(),
-            m[2][0] * v.x() + m[2][1] * v.y() + m[2][2] * v.z()
+                m[0][0] * v.x() + m[0][1] * v.y() + m[0][2] * v.z(),
+                m[1][0] * v.x() + m[1][1] * v.y() + m[1][2] * v.z(),
+                m[2][0] * v.x() + m[2][1] * v.y() + m[2][2] * v.z()
         };
     }
 };

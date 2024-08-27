@@ -35,13 +35,13 @@ public:
         root = buildRecursive(hittables, indices, sceneBounds, 0);
     }
 
-    void intersect(Ray &ray, const std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) override {
+    void intersect(Ray &ray, const std::vector<std::shared_ptr<Hittable>> &hittables, int &hitObject) override {
         double tmin = sceneBounds.intersect(ray);
         double tmax = sceneBounds.tmaxBox;
         bool liesOutsideBox =
                 tmin >= std::numeric_limits<double>::infinity() || tmax >= std::numeric_limits<double>::infinity();
         if (root && !liesOutsideBox) {
-            searchNode(root, ray, tmin, tmax, hit_object, hittables);
+            searchNode(root, ray, tmin, tmax, hitObject, hittables);
         }
     }
 
@@ -77,11 +77,11 @@ private:
 
         for (int i = 0; i < hittables.size(); ++i) {
             const auto &hittable = hittables[i];
-            if (hittable->get_bounding_box().min[splitAxis] <= splitPos) {
+            if (hittable->getBoundingBox().min[splitAxis] <= splitPos) {
                 leftHittables.push_back(hittable);
                 leftIndices.push_back(indices[i]);
             }
-            if (hittable->get_bounding_box().max[splitAxis] >= splitPos) {
+            if (hittable->getBoundingBox().max[splitAxis] >= splitPos) {
                 rightHittables.push_back(hittable);
                 rightIndices.push_back(indices[i]);
             }
@@ -101,7 +101,7 @@ private:
         return hittables.size() <= minTriangles || depth >= maxDepth;
     }
 
-    void searchNode(const std::shared_ptr<KDNode> &node, Ray &ray, double tmin, double tmax, int &hit_object,
+    void searchNode(const std::shared_ptr<KDNode> &node, Ray &ray, double tmin, double tmax, int &hitObject,
                     const std::vector<std::shared_ptr<Hittable>> &hittables) {
         std::stack<std::tuple<std::shared_ptr<KDNode>, double, double>> stack;
 
@@ -117,7 +117,7 @@ private:
                     if (hittables[index]->intersect(ray)) {
                         if (ray.t < nearestHit) nearestHit = ray.t;
                         else return; // Early termination if we already have a nearer intersection
-                        hit_object = index;
+                        hitObject = index;
                     }
                 }
             } else {
@@ -147,7 +147,7 @@ private:
     static BoundingBox calculateSceneBounds(const std::vector<std::shared_ptr<Hittable>> &hittables) {
         BoundingBox bounds;
         for (const auto &hittable: hittables) {
-            bounds = bounds.bb_union(hittable->get_bounding_box());
+            bounds = bounds.bbUnion(hittable->getBoundingBox());
         }
         return bounds;
     }

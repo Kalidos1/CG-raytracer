@@ -55,7 +55,7 @@ struct BoundingBox {
         return extent.x() * extent.y() + extent.y() * extent.z() + extent.x() * extent.z();
     }
 
-    [[nodiscard]] BoundingBox bb_union(const BoundingBox &b) const {
+    [[nodiscard]] BoundingBox bbUnion(const BoundingBox &b) const {
         return {
                 vec3(std::min(min.x(), b.min.x()),
                      std::min(min.y(), b.min.y()),

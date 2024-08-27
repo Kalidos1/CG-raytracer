@@ -25,7 +25,7 @@ public:
         }
     }
 
-    void intersect(Ray &ray, const std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) override {
+    void intersect(Ray &ray, const std::vector<std::shared_ptr<Hittable>> &hittables, int &hitObject) override {
         if (sceneBounds.intersect(ray) >= std::numeric_limits<double>::infinity()) return;
 
         // Initialize ray parameters
@@ -69,7 +69,7 @@ public:
                     if (hittables[objIndex]->intersect(ray)) {
                         if (ray.t < nearestHit) nearestHit = ray.t;
                         else return; // Early termination if we already have a nearer intersection
-                        hit_object = objIndex;
+                        hitObject = objIndex;
                     }
                 }
             } else {
@@ -78,12 +78,12 @@ public:
                 int hashIndex = hashFunction(cellCenter);
                 const std::vector<int> &objectsInCell = hashTable[hashIndex];
 
-                for (int obj_index: objectsInCell) {
+                for (int objIndex: objectsInCell) {
                     double nearestHit = ray.t;
-                    if (hittables[obj_index]->intersect(ray)) {
+                    if (hittables[objIndex]->intersect(ray)) {
                         if (ray.t < nearestHit) nearestHit = ray.t;
                         else return; // Early termination if we already have a nearer intersection
-                        hit_object = obj_index;
+                        hitObject = objIndex;
                     }
                 }
             }
@@ -143,7 +143,7 @@ private:
     void buildCompactGrid(const std::vector<std::shared_ptr<Hittable>> &hittables) {
         // Count objects per cell
         for (const auto &hittable: hittables) {
-            std::vector<int> overlappingCells = getOverlappingCells(hittable->get_bounding_box());
+            std::vector<int> overlappingCells = getOverlappingCells(hittable->getBoundingBox());
             for (int cellIndex: overlappingCells) {
                 gridCells[cellIndex]++;
             }
@@ -159,7 +159,7 @@ private:
 
         // Fill object list with corresponding indexes
         for (int i = hittables.size() - 1; i >= 0; --i) {
-            std::vector<int> overlappingCells = getOverlappingCells(hittables[i]->get_bounding_box());
+            std::vector<int> overlappingCells = getOverlappingCells(hittables[i]->getBoundingBox());
             for (int cellIndex: overlappingCells) {
                 objectList[--gridCells[cellIndex]] = i;
             }
@@ -198,7 +198,7 @@ private:
     void buildHashedGrid(const std::vector<std::shared_ptr<Hittable>> &hittables) {
         // Go through every object in our scene and add them with the hash value to the hashTable
         for (int i = 0; i < hittables.size(); ++i) {
-            std::vector<int> overlappingCells = getOverlappingCells(hittables[i]->get_bounding_box());
+            std::vector<int> overlappingCells = getOverlappingCells(hittables[i]->getBoundingBox());
 
             for (int cellIndex: overlappingCells) {
                 vec3 cellCenter = getCellCenter(cellIndex);
@@ -222,7 +222,7 @@ private:
     static BoundingBox calculateSceneBounds(const std::vector<std::shared_ptr<Hittable>> &hittables) {
         BoundingBox bounds;
         for (const auto &hittable: hittables) {
-            bounds = bounds.bb_union(hittable->get_bounding_box());
+            bounds = bounds.bbUnion(hittable->getBoundingBox());
         }
         return bounds;
     }
@@ -243,12 +243,12 @@ private:
     }
 
     [[nodiscard]] int hashFunction(const vec3 &position) const {
-        uint32_t mortonCode = encodeMorton3(position);
+        int mortonCode = encodeMorton3(position);
         return mortonCode % totalCells;
     }
 
     // TODO: MORTON CODE IN EXTRA CLASS FOR BOTH STRUCTURES
-    static inline uint32_t expandBits(uint32_t x) {
+    static inline int expandBits(int x) {
         if (x == (1 << 10)) --x;
         x = (x | (x << 16)) & 0b00000011000000000000000011111111;
         x = (x | (x << 8)) & 0b00000011000000001111000000001111;
@@ -257,7 +257,7 @@ private:
         return x;
     }
 
-    [[nodiscard]] uint32_t encodeMorton3(const vec3 &v) const {
+    [[nodiscard]] int encodeMorton3(const vec3 &v) const {
         // Normalize to [0, 1] inside the scene bounds
         const vec3 normalize = sceneBounds.offset(v);
 
@@ -273,7 +273,7 @@ private:
         return morton3D(x, y, z);
     }
 
-    static inline uint32_t morton3D(int x, int y, int z) {
+    static inline int morton3D(int x, int y, int z) {
         return (expandBits(x) << 2) | (expandBits(y) << 1) |
                expandBits(z);
     }

@@ -53,41 +53,41 @@ public:
 };
 
 // Tone mapping after https://bruop.github.io/tonemapping/
-double tone_map(const double hit) {
-    const double L_white = 4.0;
-    return hit * (1 + hit / (L_white * L_white)) / (1.0 + hit);
+double toneMap(const double hit) {
+    const double lWhite = 4.0;
+    return hit * (1 + hit / (lWhite * lWhite)) / (1.0 + hit);
 }
 
-double gammaCorrect(const double color_value) {
-    if (color_value <= 0.0) {
+double gammaCorrect(const double colorValue) {
+    if (colorValue <= 0.0) {
         return 0.0;
     }
     // Standard gamma correction value
-    return std::pow(color_value, 2.2);
+    return std::pow(colorValue, 2.2);
 }
 
-bool occluded(const std::shared_ptr<Light> &light, const vec3 &hit_point,
+bool occluded(const std::shared_ptr<Light> &light, const vec3 &hitPoint,
               std::vector<std::shared_ptr<Hittable>> &hittables,
               double t, std::unique_ptr<DataStructure> &dataStructure) {
     //Calculate light direction and shadow ray (From hitpoint to light source)
-    const vec3 light_direction = unit_vector(light->origin - hit_point);
-    Ray shadow_ray(hit_point, light_direction);
+    const vec3 lightDirection = unitVector(light->origin - hitPoint);
+    Ray shadowRay(hitPoint, lightDirection);
 
-    int hit_object = -1;
+    int hitObjectTemp = -1;
 
     // TODO: Can use other intersect method to only get the first hit -> Do not need to find the closest one
-    dataStructure->intersect(shadow_ray, hittables, hit_object);
+    dataStructure->intersect(shadowRay, hittables, hitObjectTemp);
 
-    if (hit_object != -1 && shadow_ray.t < std::numeric_limits<double>::max()) {
-        const std::shared_ptr<Hittable> &hitObject = hittables[hit_object];
+    if (hitObjectTemp != -1 && shadowRay.t < std::numeric_limits<double>::max()) {
+        const std::shared_ptr<Hittable> &hitObject = hittables[hitObjectTemp];
 
         // Check if the shadow ray intersects with the object
         // If the distance from the hit point -> Intersection point is greater than hit point
         // -> Light source than we do not consider this point because it is technically behind the light
-        if (hitObject->intersect(shadow_ray) && t < (light->origin - hit_point).length()) {
+        if (hitObject->intersect(shadowRay) && t < (light->origin - hitPoint).length()) {
             // Check if the intersection point is on the same object
-            const vec3 intersection_point = shadow_ray.origin + shadow_ray.direction * t;
-            if ((intersection_point - hit_point).length() > 1e-6) return true;
+            const vec3 intersectionPoint = shadowRay.origin + shadowRay.direction * t;
+            if ((intersectionPoint - hitPoint).length() > 1e-6) return true;
         }
     }
     return false;
@@ -101,64 +101,64 @@ vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
         return {0.7, 0.8, 1.0};
     }
 
-    int hit_object = -1;
+    int hitObjectTemp = -1;
 
-    dataStructure->intersect(ray, hittables, hit_object);
+    dataStructure->intersect(ray, hittables, hitObjectTemp);
 
     //Find the nearest object intersection
 //    for (int i = 0; i < hittables.size(); ++i) {
 //        if (hittables[i]->intersect(ray)) {
-//            hit_object = i;
+//            hitObjectTemp = i;
 //        }
 //    }
 
-    if (hit_object != -1 && ray.t < std::numeric_limits<double>::max()) {
-        const std::shared_ptr<Hittable> &hitObject = hittables[hit_object];
+    if (hitObjectTemp != -1 && ray.t < std::numeric_limits<double>::max()) {
+        const std::shared_ptr<Hittable> &hitObject = hittables[hitObjectTemp];
 
         // Calculate the hit point and normal of the object
-        const vec3 hit_point = (ray.origin + ray.direction * ray.t);
-        const vec3 barycentric = hitObject->calculate_barycentric_coordinates(hit_point);
-        const vec3 normal = hitObject->calculate_normal(hit_point, ray);
+        const vec3 hitPoint = (ray.origin + ray.direction * ray.t);
+        const vec3 barycentric = hitObject->calculateBarycentricCoordinates(hitPoint);
+        const vec3 normal = hitObject->calculateNormal(hitPoint, ray);
 
-        color hit_color = color(0, 0, 0);
-        color shade_color = color(0, 0, 0);
+        color hitColor = color(0, 0, 0);
+        color shadeColor = color(0, 0, 0);
         for (auto &light: lights) {
             // Check if the material is mirror, and if so, compute reflection recursively
 //            if (const auto mirrorMaterial = std::dynamic_pointer_cast<Mirror>(hitObject->material)) {
-//                const vec3 reflected = reflect(unit_vector(ray.direction), normal);
-//                const Ray reflected_ray(hit_point, reflected);
+//                const vec3 reflected = reflect(unitVector(ray.direction), normal);
+//                const Ray reflected_ray(hitPoint, reflected);
 //                return trace(reflected_ray, hittables, lights, depth - 1);
 //            }
 
             // Interpolate texture coordinates
-            double interpolated_uv[2] = {hitObject->interpolate_coordinate_1(barycentric),
-                                         hitObject->interpolate_coordinate_2(barycentric)};
+            double interpolatedUV[2] = {hitObject->interpolateCoordinate1(barycentric),
+                                        hitObject->interpolateCoordinate2(barycentric)};
 
-            shade_color = hitObject->material->shade(light, hit_point, ray,
-                                                     normal, hitObject->object_color, interpolated_uv);
+            shadeColor = hitObject->material->shade(light, hitPoint, ray,
+                                                    normal, hitObject->objectColor, interpolatedUV);
 
 
-            if (occluded(light, hit_point, hittables, ray.t, dataStructure)) {
-                shade_color *= 0.7;
-                hit_color += shade_color;
+            if (occluded(light, hitPoint, hittables, ray.t, dataStructure)) {
+                shadeColor *= 0.7;
+                hitColor += shadeColor;
             } else {
-                hit_color += shade_color;
+                hitColor += shadeColor;
             }
         }
 
         // Apply tone mapping
-        const double r_value = tone_map(hit_color.x());
-        const double g_value = tone_map(hit_color.y());
-        const double b_value = tone_map(hit_color.z());
+        const double rValue = toneMap(hitColor.x());
+        const double gValue = toneMap(hitColor.y());
+        const double bValue = toneMap(hitColor.z());
 
         // Gamma correct the final value
-        color final_color = {
-                gammaCorrect(r_value), gammaCorrect(g_value),
-                gammaCorrect(b_value)
+        color finalColor = {
+                gammaCorrect(rValue), gammaCorrect(gValue),
+                gammaCorrect(bValue)
         };
 
         //Clamp final color values to not overshoot the color range
-        return clamp(final_color, 0, 1);
+        return clamp(finalColor, 0, 1);
     }
 
     // Blue sky
@@ -187,39 +187,39 @@ unsigned char *load_texture(const std::string &filepath, int &width, int &height
  */
 
 struct Tile {
-    int start_x, start_y, end_x, end_y;
+    int startX, startY, endX, endY;
 };
 
 void
-renderTile(const Tile &tile, std::vector<color> &pixel_colors, point3 camera, vec3 camera_direction, int image_width,
-           int image_height, std::vector<std::shared_ptr<Hittable>> &hittables,
+renderTile(const Tile &tile, std::vector<color> &pixelColors, point3 camera, vec3 cameraDirection, int imageWidth,
+           int imageHeight, std::vector<std::shared_ptr<Hittable>> &hittables,
            const std::vector<std::shared_ptr<Light>> &lights,
            std::unique_ptr<DataStructure> &dataStructure, bool supersampling) {
-    for (int j = tile.start_y; j < tile.end_y; ++j) {
-        std::clog << "\rScanlines remaining: " << image_height - j << ' ' << std::flush;
-        for (int k = tile.start_x; k < tile.end_x; ++k) {
+    for (int j = tile.startY; j < tile.endY; ++j) {
+        std::clog << "\rScanlines remaining: " << imageHeight - j << ' ' << std::flush;
+        for (int k = tile.startX; k < tile.endX; ++k) {
             if (supersampling) {
-                color pixel_color;
+                color pixelColor;
                 for (int sy = 0; sy < 2; ++sy) {
                     for (int sx = 0; sx < 2; ++sx) {
                         // Get values between 0 and 1 to normalize coords
                         // -> Does allow mapping of pixels to point on the image regardless of resolution
-                        const double u = (k - image_width / 2 + 0.5 + sx * 0.5) / image_width;
-                        const double v = (image_height / 2 - j - 0.5 - sy * 0.5) / image_height;
+                        const double u = (k - imageWidth / 2 + 0.5 + sx * 0.5) / imageWidth;
+                        const double v = (imageHeight / 2 - j - 0.5 - sy * 0.5) / imageHeight;
 
-                        Ray ray(camera, camera_direction + vec3(u, v, 0));
-                        pixel_color = pixel_color + trace(ray, hittables, lights, 2, dataStructure);
+                        Ray ray(camera, cameraDirection + vec3(u, v, 0));
+                        pixelColor = pixelColor + trace(ray, hittables, lights, 2, dataStructure);
                     }
                 }
-                pixel_colors[j * image_width + k] = pixel_color * 0.25;
+                pixelColors[j * imageWidth + k] = pixelColor * 0.25;
             } else {
-                const double u = static_cast<double>(k - image_width / 2) / image_width;
-                const double v = static_cast<double>(image_height / 2 - j) / image_height;
-                Ray ray(camera, camera_direction + vec3(u, v, 0));
-                color pixel_color = trace(ray, hittables, lights, 2, dataStructure);
+                const double u = static_cast<double>(k - imageWidth / 2) / imageWidth;
+                const double v = static_cast<double>(imageHeight / 2 - j) / imageHeight;
+                Ray ray(camera, cameraDirection + vec3(u, v, 0));
+                color pixelColor = trace(ray, hittables, lights, 2, dataStructure);
 
                 // Apply color correction and write colors to vector
-                pixel_colors[j * image_width + k] = pixel_color;
+                pixelColors[j * imageWidth + k] = pixelColor;
             }
         }
     }
@@ -233,24 +233,24 @@ void render(const int files) {
         myFile.open(fileName);
 
         // Image
-        const int image_width = 800;
-        const int image_height = 800;
+        const int imageWidth = 800;
+        const int imageHeight = 800;
 
         // Camera
         point3 camera = point3(0, 0, 15);
         // Avoid floating point arithmetics
-        vec3 camera_direction = vec3(1e-10, 1e-10, 1e-10 + -1);
+        vec3 cameraDirection = vec3(1e-10, 1e-10, 1e-10 + -1);
 
         // Lights
         color white = color(1, 1, 1);
         Light light = Light(white, point3(25, 20, -10), vec3(0, 0, 0), 3);
 
         //Materials
-        //auto phong_material = std::make_shared<PhongMaterial>(5);
-        auto lambertian_material = std::make_shared<LambertianMaterial>();
-        auto checkered_material = std::make_shared<
+        //auto phongMaterial = std::make_shared<PhongMaterial>(5);
+        auto lambertianMaterial = std::make_shared<LambertianMaterial>();
+        auto checkeredMaterial = std::make_shared<
                 CheckeredMaterial>(5, color(0.7, 0.7, 0.7), color(0.3, 0.3, 0.3));
-        auto mirror_material = std::make_shared<Mirror>(vec3(0.8, 0.3, 0.3));
+        auto mirrorMaterial = std::make_shared<Mirror>(vec3(0.8, 0.3, 0.3));
 
 
         //Objects
@@ -262,11 +262,11 @@ void render(const int files) {
         //Load texture
 //        std::string filename_image = "obj_files/fabric.png";
         //      std::filesystem::path filepath_image = std::filesystem::current_path().parent_path() / filename_image;
-        int texture_width, texture_height, texture_channels;
-        //   unsigned char *texture_data = load_texture(filepath_image.string(), texture_width, texture_height,
-        //                                       texture_channels);
+        int textureWidth, textureHeight, textureChannels;
+        //   unsigned char *textureData = load_texture(filepath_image.string(), textureWidth, textureHeight,
+        //                                       textureChannels);
 
-        unsigned char *texture_data = nullptr;
+        unsigned char *textureData = nullptr;
 
         // Get filename in subfolder
         std::string filename = "obj_files/teapot.obj";
@@ -298,28 +298,28 @@ void render(const int files) {
                     vec3 v3(currentMesh.Vertices[idx3].Position.X, currentMesh.Vertices[idx3].Position.Y,
                             currentMesh.Vertices[idx3].Position.Z);
 
-                    const double texture_v0[2] = {currentMesh.Vertices[idx1].TextureCoordinate.X,
-                                                  currentMesh.Vertices[idx1].TextureCoordinate.Y};
-                    const double texture_v1[2] = {currentMesh.Vertices[idx2].TextureCoordinate.X,
-                                                  currentMesh.Vertices[idx2].TextureCoordinate.Y};
-                    const double texture_v2[2] = {currentMesh.Vertices[idx3].TextureCoordinate.X,
-                                                  currentMesh.Vertices[idx3].TextureCoordinate.Y};
+                    const double textureV0[2] = {currentMesh.Vertices[idx1].TextureCoordinate.X,
+                                                 currentMesh.Vertices[idx1].TextureCoordinate.Y};
+                    const double textureV1[2] = {currentMesh.Vertices[idx2].TextureCoordinate.X,
+                                                 currentMesh.Vertices[idx2].TextureCoordinate.Y};
+                    const double textureV2[2] = {currentMesh.Vertices[idx3].TextureCoordinate.X,
+                                                 currentMesh.Vertices[idx3].TextureCoordinate.Y};
 
-                    const color ambient_color = {currentMesh.MeshMaterial.Ka.X, currentMesh.MeshMaterial.Ka.Y,
-                                                 currentMesh.MeshMaterial.Ka.Z};
-                    const color diffuse_color = {currentMesh.MeshMaterial.Kd.X, currentMesh.MeshMaterial.Kd.Y,
-                                                 currentMesh.MeshMaterial.Kd.Z};
-                    const color specular_color = {currentMesh.MeshMaterial.Ks.X, currentMesh.MeshMaterial.Ks.Y,
-                                                  currentMesh.MeshMaterial.Ks.Z};
+                    const color ambientColor = {currentMesh.MeshMaterial.Ka.X, currentMesh.MeshMaterial.Ka.Y,
+                                                currentMesh.MeshMaterial.Ka.Z};
+                    const color diffuseColor = {currentMesh.MeshMaterial.Kd.X, currentMesh.MeshMaterial.Kd.Y,
+                                                currentMesh.MeshMaterial.Kd.Z};
+                    const color specularColor = {currentMesh.MeshMaterial.Ks.X, currentMesh.MeshMaterial.Ks.Y,
+                                                 currentMesh.MeshMaterial.Ks.Z};
 
-                    auto phong_material_test = std::make_shared<PhongMaterial>(32, texture_data, texture_width,
-                                                                               texture_height, texture_channels,
-                                                                               ambient_color, diffuse_color,
-                                                                               specular_color);
+                    auto phongMaterialTest = std::make_shared<PhongMaterial>(32, textureData, textureWidth,
+                                                                             textureHeight, textureChannels,
+                                                                             ambientColor, diffuseColor,
+                                                                             specularColor);
 
                     // Create the triangle
-                    Triangle triangle(v1, v2, v3, texture_v0, texture_v1, texture_v2, color(0.7, 0.2, 0.2),
-                                      phong_material_test);
+                    Triangle triangle(v1, v2, v3, textureV0, textureV1, textureV2, color(0.7, 0.2, 0.2),
+                                      phongMaterialTest);
 
                     // first vertex coordinates -> Update min and mx by comparing them -> Min smaller -> Max larger
                     // Calculate center -> sum up all vertex coordinates -> divide the sum of x y and z by total number of vertices
@@ -341,19 +341,19 @@ void render(const int files) {
 
         // Transform objects with model transform
 //        for (const auto &object: hittables) {
-//            object->apply_model_transform(vec3(0, 0, 0), vec3(0, 1, 0), vec3(0, 0, 0), 25,
-//                                          object->calculate_center());
+//            object->applyModelTransform(vec3(0, 0, 0), vec3(0, 1, 0), vec3(0, 0, 0), 25,
+//                                          object->calculateCenter());
 //        }
 
         const vec3 rotation_vector = vec3(0, 1, 0);
 
         // Transform camera -> Move all objects as if we would move the camera
         for (const auto &object: hittables) {
-            //object->apply_view_transform(vec3(0, 1, 0), rotation_vector, 180, camera);
+            //object->applyViewTransform(vec3(0, 1, 0), rotation_vector, 180, camera);
         }
 
         // Make transform to light to simulate camera movement
-        //light.apply_view_transform(vec3(0, 0, 0), rotation_vector, 45);
+        //light.applyViewTransform(vec3(0, 0, 0), rotation_vector, 45);
         // Create the light plane which simulates 3x3 light
         const std::vector<std::shared_ptr<Light>> lights = light.createPlaneLight();
 
@@ -374,10 +374,10 @@ void render(const int files) {
         auto durationBVH = duration_cast<microseconds>(stopBVH - startBVH);
 
         // Render
-        myFile << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+        myFile << "P3\n" << imageWidth << ' ' << imageHeight << "\n255\n";
 
         // Create a vector to store all pixel colors
-        std::vector<color> pixel_colors(image_width * image_height);
+        std::vector<color> pixelColors(imageWidth * imageHeight);
 
         // Go over every pixel in image height and width
         auto startPixel = high_resolution_clock::now();
@@ -385,11 +385,11 @@ void render(const int files) {
         std::queue<Tile> tileQueue;
 
         const int tileSize = 32;
-        for (int y = 0; y < image_height; y += tileSize) {
-            for (int x = 0; x < image_width; x += tileSize) {
+        for (int y = 0; y < imageHeight; y += tileSize) {
+            for (int x = 0; x < imageWidth; x += tileSize) {
                 tileQueue.push({x, y,
-                                std::min(x + tileSize, image_width),
-                                std::min(y + tileSize, image_height)});
+                                std::min(x + tileSize, imageWidth),
+                                std::min(y + tileSize, imageHeight)});
             }
         }
 
@@ -406,7 +406,7 @@ void render(const int files) {
                     tile = tileQueue.front();
                     tileQueue.pop();
                 }
-                renderTile(tile, pixel_colors, camera, camera_direction, image_width, image_height, hittables, lights,
+                renderTile(tile, pixelColors, camera, cameraDirection, imageWidth, imageHeight, hittables, lights,
                            dataStructure, true);
             }
         };
@@ -430,8 +430,8 @@ void render(const int files) {
 
         auto startWritingToFile = high_resolution_clock::now();
         // Write all pixel colors to file at once
-        for (const auto &pixel_color: pixel_colors) {
-            write_color(myFile, pixel_color);
+        for (const auto &pixel_color: pixelColors) {
+            writeColor(myFile, pixel_color);
         }
         auto stopWritingToFile = high_resolution_clock::now();
         auto durationWritingToFile = duration_cast<microseconds>(stopWritingToFile - startWritingToFile);
@@ -449,7 +449,7 @@ void render(const int files) {
                   << durationWritingToFile.count() / 1000 << " milliseconds" << std::endl;
 
 
-        stbi_image_free(texture_data);
+        stbi_image_free(textureData);
         myFile.close();
     }
 }
