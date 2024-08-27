@@ -2,12 +2,13 @@
 #define RAYTRACER_UNIFORM_GRID_H
 
 #include <vector>
+#include "data_structure.h"
 
 enum class GridType {
     Compact, Hashed
 };
 
-class UniformGrid {
+class UniformGrid : public DataStructure {
 public:
     explicit UniformGrid(int numTriangles, GridType type = GridType::Compact) : gridDimensions(vec3(0, 0, 0)),
                                                                                 cellSize(vec3(0, 0, 0)), gridCells(),
@@ -15,7 +16,7 @@ public:
                                                                                 sceneBounds(), gridType(type),
                                                                                 totalCells(0) {}
 
-    void build(const std::vector<std::shared_ptr<Hittable>> &hittables) {
+    void build(const std::vector<std::shared_ptr<Hittable>> &hittables) override {
         createGrid(hittables);
         if (gridType == GridType::Compact) {
             buildCompactGrid(hittables);
@@ -24,7 +25,7 @@ public:
         }
     }
 
-    void intersect(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) {
+    void intersect(Ray &ray, const std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) override {
         if (sceneBounds.intersect(ray) >= std::numeric_limits<double>::infinity()) return;
 
         // Initialize ray parameters
@@ -220,10 +221,6 @@ private:
 
     static BoundingBox calculateSceneBounds(const std::vector<std::shared_ptr<Hittable>> &hittables) {
         BoundingBox bounds;
-        int imin = std::numeric_limits<int>::min();
-        int imax = std::numeric_limits<int>::max();
-        bounds.min = vec3(imax, imax, imax);
-        bounds.max = vec3(imin, imin, imin);
         for (const auto &hittable: hittables) {
             bounds = bounds.bb_union(hittable->get_bounding_box());
         }

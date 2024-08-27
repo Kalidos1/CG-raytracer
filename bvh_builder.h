@@ -6,6 +6,7 @@
 #include <memory>
 #include <algorithm>
 #include <queue>
+#include "data_structure.h"
 
 enum Split {
     Middle, SAH, Linear, LinearSAH
@@ -28,13 +29,13 @@ struct MortonPrimitive {
     int primitiveIndex;
 };
 
-class BVHBuilder {
+class BVHBuilder : public DataStructure {
 public:
     explicit BVHBuilder(int numTriangles, Split split) : triIdx(new int[numTriangles]),
                                                          bvhNode(new BVHNode[2 * numTriangles]), rootNodeIdx(0),
                                                          nodesUsed(1), numTriangles(numTriangles), split(split) {}
 
-    void build(const std::vector<std::shared_ptr<Hittable>> &hittables) {
+    void build(const std::vector<std::shared_ptr<Hittable>> &hittables) override {
         if (split == Split::Linear) {
             // Build BVH Bottom-Up
             build_bvh_bottom_up(hittables, 0);
@@ -52,12 +53,13 @@ public:
         }
     }
 
-    void intersect(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) {
+    void intersect(Ray &ray, const std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) override {
         intersect_bvh(ray, rootNodeIdx, hittables, hit_object);
     }
 
     void
-    intersect_bvh(Ray &ray, const int nodeIdx, std::vector<std::shared_ptr<Hittable>> &hittables, int &hit_object) {
+    intersect_bvh(Ray &ray, const int nodeIdx, const std::vector<std::shared_ptr<Hittable>> &hittables,
+                  int &hit_object) {
         BVHNode *node = &bvhNode[nodeIdx], *stack[64];
         int stackPtr = 0;
 
@@ -105,10 +107,6 @@ private:
 
     void update_node_bounds(int nodeIdx, const std::vector<std::shared_ptr<Hittable>> &hittables) {
         BVHNode &node = bvhNode[nodeIdx];
-        int imin = std::numeric_limits<int>::min();
-        int imax = std::numeric_limits<int>::max();
-        node.boundingBox.min = vec3(imax, imax, imax);
-        node.boundingBox.max = vec3(imin, imin, imin);
         for (int first = node.leftFirst, i = 0; i < node.triCount; i++) {
             const int leafTriIdx = triIdx[first + i];
             const BoundingBox &bounding_box = hittables[leafTriIdx]->get_bounding_box();

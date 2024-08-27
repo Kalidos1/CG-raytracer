@@ -9,6 +9,7 @@
 #include "obj_loader.h"
 #include "bvh_builder.h"
 #include "uniform_grid.h"
+#include "bsp_trees.h"
 
 #include <iostream>
 #include <fstream>
@@ -28,6 +29,29 @@
 
 using namespace std::chrono;
 
+class DataStructureFactory {
+public:
+    enum class DataStructureType {
+        BVH,
+        Grid,
+        BSP
+    };
+
+    static std::unique_ptr<DataStructure>
+    create(DataStructureType type, int size, Split split, GridType gridType, TreeType treeType) {
+        switch (type) {
+            case DataStructureType::BVH:
+                return std::make_unique<BVHBuilder>(size, split);
+            case DataStructureType::Grid:
+                return std::make_unique<UniformGrid>(size, gridType);
+            case DataStructureType::BSP:
+                return std::make_unique<BSPTree>(size, treeType);
+            default:
+                throw std::runtime_error("Unknown data structure type");
+        }
+    }
+};
+
 // Tone mapping after https://bruop.github.io/tonemapping/
 double tone_map(const double hit) {
     const double L_white = 4.0;
@@ -44,14 +68,15 @@ double gammaCorrect(const double color_value) {
 
 bool occluded(const std::shared_ptr<Light> &light, const vec3 &hit_point,
               std::vector<std::shared_ptr<Hittable>> &hittables,
-              double t, UniformGrid &uniformGrid) {
+              double t, std::unique_ptr<DataStructure> &dataStructure) {
     //Calculate light direction and shadow ray (From hitpoint to light source)
     const vec3 light_direction = unit_vector(light->origin - hit_point);
     Ray shadow_ray(hit_point, light_direction);
 
     int hit_object = -1;
 
-    uniformGrid.intersect(shadow_ray, hittables, hit_object);
+    // TODO: Can use other intersect method to only get the first hit -> Do not need to find the closest one
+    dataStructure->intersect(shadow_ray, hittables, hit_object);
 
     if (hit_object != -1 && shadow_ray.t < std::numeric_limits<double>::max()) {
         const std::shared_ptr<Hittable> &hitObject = hittables[hit_object];
@@ -71,14 +96,14 @@ bool occluded(const std::shared_ptr<Light> &light, const vec3 &hit_point,
 
 vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
            const std::vector<std::shared_ptr<Light>> &lights,
-           const int depth, UniformGrid &uniformGrid) {
+           const int depth, std::unique_ptr<DataStructure> &dataStructure) {
     if (depth <= 0) {
         return {0.7, 0.8, 1.0};
     }
 
     int hit_object = -1;
 
-    uniformGrid.intersect(ray, hittables, hit_object);
+    dataStructure->intersect(ray, hittables, hit_object);
 
     //Find the nearest object intersection
 //    for (int i = 0; i < hittables.size(); ++i) {
@@ -113,7 +138,7 @@ vec3 trace(Ray &ray, std::vector<std::shared_ptr<Hittable>> &hittables,
                                                      normal, hitObject->object_color, interpolated_uv);
 
 
-            if (occluded(light, hit_point, hittables, ray.t, uniformGrid)) {
+            if (occluded(light, hit_point, hittables, ray.t, dataStructure)) {
                 shade_color *= 0.7;
                 hit_color += shade_color;
             } else {
@@ -153,25 +178,23 @@ unsigned char *load_texture(const std::string &filepath, int &width, int &height
 
 /*
  * TODO:
- * 4. Maybe check out some other implementation that could be cool, might look at some octrees with lbvh or something
+ * 4. BERICHT ERSTMAL
  * 5. Check all things and make some overall improvements to code variables etc. -> Sort code very important!!!!
  * 6. Check why Linear and BVHs are all quite slower than Grid
  * 7. Make some images to show how different volumes are constructed
+ * 8. Obj loader fix
+ * 9. Maybe noch OCTREE STUFF
  */
 
-
-
-// Define a Tile structure
 struct Tile {
     int start_x, start_y, end_x, end_y;
 };
 
-// Function to render a single tile
 void
 renderTile(const Tile &tile, std::vector<color> &pixel_colors, point3 camera, vec3 camera_direction, int image_width,
            int image_height, std::vector<std::shared_ptr<Hittable>> &hittables,
            const std::vector<std::shared_ptr<Light>> &lights,
-           UniformGrid &uniformGrid, bool supersampling) {
+           std::unique_ptr<DataStructure> &dataStructure, bool supersampling) {
     for (int j = tile.start_y; j < tile.end_y; ++j) {
         std::clog << "\rScanlines remaining: " << image_height - j << ' ' << std::flush;
         for (int k = tile.start_x; k < tile.end_x; ++k) {
@@ -185,7 +208,7 @@ renderTile(const Tile &tile, std::vector<color> &pixel_colors, point3 camera, ve
                         const double v = (image_height / 2 - j - 0.5 - sy * 0.5) / image_height;
 
                         Ray ray(camera, camera_direction + vec3(u, v, 0));
-                        pixel_color = pixel_color + trace(ray, hittables, lights, 2, uniformGrid);
+                        pixel_color = pixel_color + trace(ray, hittables, lights, 2, dataStructure);
                     }
                 }
                 pixel_colors[j * image_width + k] = pixel_color * 0.25;
@@ -193,7 +216,7 @@ renderTile(const Tile &tile, std::vector<color> &pixel_colors, point3 camera, ve
                 const double u = static_cast<double>(k - image_width / 2) / image_width;
                 const double v = static_cast<double>(image_height / 2 - j) / image_height;
                 Ray ray(camera, camera_direction + vec3(u, v, 0));
-                color pixel_color = trace(ray, hittables, lights, 2, uniformGrid);
+                color pixel_color = trace(ray, hittables, lights, 2, dataStructure);
 
                 // Apply color correction and write colors to vector
                 pixel_colors[j * image_width + k] = pixel_color;
@@ -214,7 +237,7 @@ void render(const int files) {
         const int image_height = 800;
 
         // Camera
-        point3 camera = point3(0, 0.15, 0.25);
+        point3 camera = point3(0, 0, 15);
         // Avoid floating point arithmetics
         vec3 camera_direction = vec3(1e-10, 1e-10, 1e-10 + -1);
 
@@ -246,7 +269,7 @@ void render(const int files) {
         unsigned char *texture_data = nullptr;
 
         // Get filename in subfolder
-        std::string filename = "obj_files/dragon.obj";
+        std::string filename = "obj_files/teapot.obj";
         std::filesystem::path filepath = std::filesystem::current_path().parent_path() / filename;
         std::cout << "Attempting to open file: " << filepath << std::endl;
 
@@ -336,12 +359,16 @@ void render(const int files) {
 
         auto startBVH = high_resolution_clock::now();
 
-        //BVHBuilder bvhBuilder = *new BVHBuilder(hittables.size(), Split::Linear);
-        //bvhBuilder.build(hittables);
+        // Change variables according to wanted data structure
+        auto dataStructureType = DataStructureFactory::DataStructureType::BSP; // Grid | BVH | BSP
+        GridType gridType = GridType::Compact; // Compact | Hashed
+        Split bvhSplitType = Split::Middle; // Middle | SAH | Linear | LinearSAH
+        TreeType treeType = TreeType::KD; // KD | Octree
 
-        UniformGrid uniformGrid = *new UniformGrid(hittables.size());
-        uniformGrid.build(hittables);
-
+        // Create the acceleration structure
+        auto dataStructure = DataStructureFactory::create(dataStructureType, hittables.size(), bvhSplitType, gridType,
+                                                          treeType);
+        dataStructure->build(hittables);
 
         auto stopBVH = high_resolution_clock::now();
         auto durationBVH = duration_cast<microseconds>(stopBVH - startBVH);
@@ -380,7 +407,7 @@ void render(const int files) {
                     tileQueue.pop();
                 }
                 renderTile(tile, pixel_colors, camera, camera_direction, image_width, image_height, hittables, lights,
-                           uniformGrid, false);
+                           dataStructure, true);
             }
         };
 
@@ -401,7 +428,6 @@ void render(const int files) {
         auto stopPixel = high_resolution_clock::now();
         auto durationPixel = duration_cast<microseconds>(stopPixel - startPixel);
 
-        // Go over every pixel in image height and width
         auto startWritingToFile = high_resolution_clock::now();
         // Write all pixel colors to file at once
         for (const auto &pixel_color: pixel_colors) {

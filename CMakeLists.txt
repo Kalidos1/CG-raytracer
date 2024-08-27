@@ -18,4 +18,6 @@ add_executable(raytracer main.cpp
         bvh_builder.h
         bvh_builder.h
         uniform_grid.h
-        data_structure.h)
+        data_structure.h
+        data_structure.h
+        bsp_trees.h)

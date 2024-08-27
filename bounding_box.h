@@ -9,6 +9,7 @@
 struct BoundingBox {
     vec3 min;
     vec3 max;
+    double tmaxBox = std::numeric_limits<double>::infinity();
 
     BoundingBox() {
         int imin = std::numeric_limits<int>::min();
@@ -19,27 +20,7 @@ struct BoundingBox {
 
     BoundingBox(const vec3 &min, const vec3 &max) : min(min), max(max) {}
 
-    [[nodiscard]] double intersect(Ray &ray) const {
-//        // AABB intersection with SLAB method
-//        double tmin = -std::numeric_limits<double>::max(), tmax = std::numeric_limits<double>::max();
-//
-//        // Iterate over each dimension
-//        for (int i = 0; i < 3; ++i) {
-//            double invD = 1.0 / ray.direction[i];
-//            // Compute intersection
-//            double t0 = (min[i] - ray.origin[i]) * invD;
-//            double t1 = (max[i] - ray.origin[i]) * invD;
-//            // Check for negative ray direction
-//            if (invD < 0.0)
-//                std::swap(t0, t1);
-//            tmin = t0 > tmin ? t0 : tmin;
-//            tmax = t1 < tmax ? t1 : tmax;
-//            if (tmax <= tmin)
-//                return false;
-//        }
-//        // Check for valid intersection
-//        return tmax >= 0 && tmin < ray.t;
-
+    [[nodiscard]] double intersect(Ray &ray) {
         double tx1 = (min.x() - ray.origin.x()) / ray.direction.x(), tx2 =
                 (max.x() - ray.origin.x()) / ray.direction.x();
         double tmin = std::min(tx1, tx2), tmax = std::max(tx1, tx2);
@@ -49,7 +30,12 @@ struct BoundingBox {
         double tz1 = (min.z() - ray.origin.z()) / ray.direction.z(), tz2 =
                 (max.z() - ray.origin.z()) / ray.direction.z();
         tmin = std::max(tmin, std::min(tz1, tz2)), tmax = std::min(tmax, std::max(tz1, tz2));
-        if (tmax >= tmin && tmin < ray.t && tmax > 0) return tmin; else return std::numeric_limits<double>::infinity();
+        if (tmax >= tmin && tmin < ray.t && tmax > 0) {
+            tmaxBox = tmax;
+            return tmin;
+        } else {
+            return std::numeric_limits<double>::infinity();
+        }
     }
 
     void grow(vec3 vector) {
