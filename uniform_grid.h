@@ -68,7 +68,7 @@ public:
                     double nearestHit = ray.t;
                     if (hittables[objIndex]->intersect(ray)) {
                         if (ray.t < nearestHit) nearestHit = ray.t;
-                        else return; // Early termination if we already have a nearer intersection
+                        else break; // Early termination if we already have a nearer intersection
                         hitObject = objIndex;
                     }
                 }

@@ -24,7 +24,7 @@ class BSPTree : public DataStructure {
 public:
     // Not sure about the maxdepth maybe there are some calculations or other things todo here
     // Maybe also read about it alittle bit -> Tradeoff between leaf tirnalges and build time
-    explicit BSPTree(int numTriangles, TreeType type = TreeType::KD) : root(nullptr), maxDepth(20), minTriangles(20) {}
+    explicit BSPTree(int numTriangles, TreeType type = TreeType::KD) : root(nullptr), maxDepth(50), minTriangles(5) {}
 
     void build(const std::vector<std::shared_ptr<Hittable>> &hittables) override {
         sceneBounds = calculateSceneBounds(hittables);

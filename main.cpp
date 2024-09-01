@@ -233,17 +233,17 @@ void render(const int files) {
         myFile.open(fileName);
 
         // Image
-        const int imageWidth = 800;
-        const int imageHeight = 800;
+        const int imageWidth = 1600;
+        const int imageHeight = 1600;
 
         // Camera
-        point3 camera = point3(0, 0, 15);
+        point3 camera = point3(-400, 350, 450);
         // Avoid floating point arithmetics
-        vec3 cameraDirection = vec3(1e-10, 1e-10, 1e-10 + -1);
+        vec3 cameraDirection = vec3(1e-10 + 0.5, 1e-10, 1e-10 + -1);
 
         // Lights
         color white = color(1, 1, 1);
-        Light light = Light(white, point3(25, 20, -10), vec3(0, 0, 0), 3);
+        Light light = Light(white, point3(-500, 350, -400), vec3(0, 0, 0), 1.7);
 
         //Materials
         //auto phongMaterial = std::make_shared<PhongMaterial>(5);
@@ -260,16 +260,24 @@ void render(const int files) {
         //hittables.reserve(number_of_triangles);
 
         //Load texture
-//        std::string filename_image = "obj_files/fabric.png";
-        //      std::filesystem::path filepath_image = std::filesystem::current_path().parent_path() / filename_image;
+//        std::string filename_image = "obj_files/roadBike.png";
+//        std::filesystem::path filepath_image = std::filesystem::current_path().parent_path() / filename_image;
         int textureWidth, textureHeight, textureChannels;
-        //   unsigned char *textureData = load_texture(filepath_image.string(), textureWidth, textureHeight,
-        //                                       textureChannels);
+//        unsigned char *textureData = load_texture(filepath_image.string(), textureWidth, textureHeight,
+//                                                  textureChannels);
 
         unsigned char *textureData = nullptr;
 
+        //teapot = (-0, 40, 175)
+        /*
+         *         point3 camera = point3(0, 2, 37.5);
+        // Avoid floating point arithmetics
+        vec3 cameraDirection = vec3(1e-10, 1e-10 + -0.1, 1e-10 + -1);
+                 Light light = Light(white, point3(0, 100, 100), vec3(0, 0, 0), 3);
+         */
+
         // Get filename in subfolder
-        std::string filename = "obj_files/teapot.obj";
+        std::string filename = "obj_files/conference.obj";
         std::filesystem::path filepath = std::filesystem::current_path().parent_path() / filename;
         std::cout << "Attempting to open file: " << filepath << std::endl;
 
@@ -312,13 +320,16 @@ void render(const int files) {
                     const color specularColor = {currentMesh.MeshMaterial.Ks.X, currentMesh.MeshMaterial.Ks.Y,
                                                  currentMesh.MeshMaterial.Ks.Z};
 
-                    auto phongMaterialTest = std::make_shared<PhongMaterial>(32, textureData, textureWidth,
+                    const float specularComponent = currentMesh.MeshMaterial.Ns;
+
+                    auto phongMaterialTest = std::make_shared<PhongMaterial>(specularComponent, textureData,
+                                                                             textureWidth,
                                                                              textureHeight, textureChannels,
                                                                              ambientColor, diffuseColor,
                                                                              specularColor);
 
                     // Create the triangle
-                    Triangle triangle(v1, v2, v3, textureV0, textureV1, textureV2, color(0.7, 0.2, 0.2),
+                    Triangle triangle(v1, v2, v3, textureV0, textureV1, textureV2, color(0.66, 0.66, 0.66),
                                       phongMaterialTest);
 
                     // first vertex coordinates -> Update min and mx by comparing them -> Min smaller -> Max larger
@@ -349,7 +360,7 @@ void render(const int files) {
 
         // Transform camera -> Move all objects as if we would move the camera
         for (const auto &object: hittables) {
-            //object->applyViewTransform(vec3(0, 1, 0), rotation_vector, 180, camera);
+            object->applyViewTransform(vec3(0, 1, 0), rotation_vector, 90, camera);
         }
 
         // Make transform to light to simulate camera movement
@@ -360,9 +371,9 @@ void render(const int files) {
         auto startBVH = high_resolution_clock::now();
 
         // Change variables according to wanted data structure
-        auto dataStructureType = DataStructureFactory::DataStructureType::BSP; // Grid | BVH | BSP
+        auto dataStructureType = DataStructureFactory::DataStructureType::Grid; // Grid | BVH | BSP
         GridType gridType = GridType::Compact; // Compact | Hashed
-        Split bvhSplitType = Split::Middle; // Middle | SAH | Linear | LinearSAH
+        Split bvhSplitType = Split::SAH; // Middle | SAH | Linear | LinearSAH
         TreeType treeType = TreeType::KD; // KD | Octree
 
         // Create the acceleration structure

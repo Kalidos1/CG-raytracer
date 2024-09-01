@@ -42,14 +42,14 @@ public:
         const double specularComponent = std::pow(std::max(dot(viewerDirection, -reflectionVector), 0.0), shininess);
 
         //Ambient
-        const color ambientColor = tempColor * 0.5;
+        //const color ambientColor = temp_color * 0.5;
 
         //Phong Formula
-        const vec3 ambientReflection = 1 / M_PI * ambientColor * light->intensity;
+        const vec3 ambientReflection = 1 / M_PI * ambient_color_temp * light->intensity;
         const vec3 surfaceIllumination = light->lightColor * std::max(0.0, dot(lightDirection, normal)) * light->
                 intensity;
-        const vec3 diffuseReflection = 1 / M_PI * (tempColor) * light->intensity;
-        const vec3 specularReflection = white * specularComponent * light->intensity;
+        const vec3 diffuseReflection = 1 / M_PI * (diffuse_color_temp) * light->intensity;
+        const vec3 specularReflection = specular_color_temp * specularComponent * light->intensity;
 
         const vec3 phongShade = ambientReflection + surfaceIllumination * (
                 diffuseReflection + specularReflection);

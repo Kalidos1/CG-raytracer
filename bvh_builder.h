@@ -41,7 +41,7 @@ public:
             buildBvhBottomUp(hittables, 0);
         } else if (split == Split::LinearSAH) {
             // Build BVH Bottom-Up
-            buildBvhBottomUp(hittables, 32);
+            buildBvhBottomUp(hittables, 64);
         } else {
             // Build BVH Top-Down
             for (int i = 0; i < numTriangles; i++) triIdx[i] = i;
@@ -239,7 +239,7 @@ private:
         //const vec3 normalize = (v - globalBounds.min) / (globalBounds.max - globalBounds.min);
         const vec3 normalize = globalBounds.offset(v);
 
-        int scale = gridResolution - 1;
+        int scale = 160;
 
         // Scale to [0, scale] depending on the average triangle volume
         int x = static_cast<int>(normalize.x() * scale);
