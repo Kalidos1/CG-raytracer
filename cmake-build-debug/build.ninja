@@ -49,11 +49,12 @@ cmake_ninja_workdir = /Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-rayt
 
 build cmake_object_order_depends_target_raytracer: phony || .
 
-build CMakeFiles/raytracer.dir/main.cpp.o: CXX_COMPILER__raytracer_unscanned_Debug /Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/main.cpp || cmake_object_order_depends_target_raytracer
-  DEP_FILE = CMakeFiles/raytracer.dir/main.cpp.o.d
+build CMakeFiles/raytracer.dir/src/main.cpp.o: CXX_COMPILER__raytracer_unscanned_Debug /Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/src/main.cpp || cmake_object_order_depends_target_raytracer
+  DEP_FILE = CMakeFiles/raytracer.dir/src/main.cpp.o.d
   FLAGS = -g -std=gnu++2a -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.0.sdk -fcolor-diagnostics
+  INCLUDES = -I/Users/andre/MasterCS/3.Semester/LabCourseGraphics/CG-raytracer/src
   OBJECT_DIR = CMakeFiles/raytracer.dir
-  OBJECT_FILE_DIR = CMakeFiles/raytracer.dir
+  OBJECT_FILE_DIR = CMakeFiles/raytracer.dir/src
 
 
 # =============================================================================
@@ -63,7 +64,7 @@ build CMakeFiles/raytracer.dir/main.cpp.o: CXX_COMPILER__raytracer_unscanned_Deb
 #############################################
 # Link the executable raytracer
 
-build raytracer: CXX_EXECUTABLE_LINKER__raytracer_Debug CMakeFiles/raytracer.dir/main.cpp.o
+build raytracer: CXX_EXECUTABLE_LINKER__raytracer_Debug CMakeFiles/raytracer.dir/src/main.cpp.o
   FLAGS = -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.0.sdk
   OBJECT_DIR = CMakeFiles/raytracer.dir
   POST_BUILD = :

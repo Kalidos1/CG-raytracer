@@ -3,21 +3,16 @@ project(raytracer)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(raytracer main.cpp
-        vec3.h
-        color.h
-        hittable.h
-        material.h
-        ray.h
-        triangle.h
-        mat3.h
-        light.h
-        bounding_box.h
-        obj_loader.h
-        bvh_builder.h
-        bvh_builder.h
-        bvh_builder.h
-        uniform_grid.h
-        data_structure.h
-        data_structure.h
-        bsp_trees.h)
+# Collect all header files
+file(GLOB_RECURSE HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
+)
+
+# Create executable with main.cpp and specify include directory
+add_executable(${PROJECT_NAME} src/main.cpp ${HEADERS})
+
+# Add include directories
+target_include_directories(${PROJECT_NAME}
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)

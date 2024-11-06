@@ -1,0 +1,74 @@
+#ifndef SPHERE_H
+#define SPHERE_H
+
+#include "color.h"
+#include "Hittable.h"
+#include "material.h"
+
+class Sphere : public Hittable {
+public:
+    Sphere(const point3 &_center, const double _radius, const Color &_sphere_color,
+           const std::shared_ptr<Material> &material) : center(_center),
+                                                        radius(_radius),
+                                                        Hittable(_sphere_color, material) {
+    }
+
+
+    bool intersect(const Ray &ray, double &t) const override {
+        const Vec3 oc = ray.origin - center;
+        const double a = dot(ray.direction, ray.direction);
+        const double b = 2 * dot(oc, ray.direction);
+        const double c = dot(oc, oc) - pow(radius, 2);
+
+        const double discriminant = b * b - 4 * a * c;
+        if (discriminant < 0) return false;
+
+        // Find the nearest intersection which is in acceptable range
+        const double t1 = (-b - sqrt(discriminant)) / (2.0f * a);
+        const double t2 = (-b + sqrt(discriminant)) / (2.0f * a);
+
+        if (t1 > 0.001f && t1 < t) {
+            t = t1;
+            return true;
+        }
+
+        if (t2 > 0.001f && t2 < t) {
+            t = t2;
+            return true;
+        }
+
+        return false;
+    }
+
+    [[nodiscard]] Vec3 calculateNormal(const point3 &hitPoint, const Ray &ray) const override {
+        return unitVector(hitPoint - center);
+    }
+
+    [[nodiscard]] point3 calculateCenter() const override {
+        return center;
+    }
+
+    // Only translation, due to sphere
+    void applyModelTransform(const Vec3 &translation, const Vec3 &rotation, const Vec3 &shear, double angle,
+                             const point3 &objectCenter) override {
+        center = center + translation;
+    }
+
+    // We subtract to simulate camera movement
+    void applyViewTransform(const Vec3 &translation, const Vec3 &rotation, double angle, const point3 &cam) override {
+        center = center - translation;
+    }
+
+    [[nodiscard]] BoundingBox getBoundingBox() const override {
+        const Vec3 min = center - Vec3(radius, radius, radius);
+        const Vec3 max = center + Vec3(radius, radius, radius);
+
+        return {min, max};
+    }
+
+private:
+    point3 center;
+    double radius;
+};
+
+#endif //SPHERE_H

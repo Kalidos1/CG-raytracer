@@ -7,11 +7,9 @@ help:
 	@echo "* run		to run the executable"
 
 build:
-	cmake --build build
+	cmake --build cmake-build-debug --target raytracer -j 14
 
 run:
-	./build/raytracer > image.ppm
+	./cmake-build-debug/raytracer
 
-all:
-	cmake --build build && ./build/raytracer > image.ppm
-
+all: build run
