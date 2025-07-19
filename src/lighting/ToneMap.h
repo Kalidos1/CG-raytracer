@@ -11,35 +11,46 @@ public:
 
 protected:
     static double gamma_correct(const double colorValue) {
-        if (colorValue <= 0.0) {
-            return 0.0;
-        }
-        return std::pow(colorValue, 2.2);
+        return std::pow(std::max(0.0, colorValue), 1.0 / 2.2);
     }
 };
 
 class ReinhardToneMap : public ToneMap {
 public:
-    explicit ReinhardToneMap(double white_point = 4.0)
+    explicit ReinhardToneMap(double white_point)
             : white_point_(white_point) {}
 
     [[nodiscard]] Color apply(const Color &color) const override {
-        const double rValue = tone_map(color.x());
-        const double gValue = tone_map(color.y());
-        const double bValue = tone_map(color.z());
+        const Color toneMappedColor = reinhard_extended(color);
 
         return {
-                gamma_correct(rValue),
-                gamma_correct(gValue),
-                gamma_correct(bValue)
+                gamma_correct(toneMappedColor.x()),
+                gamma_correct(toneMappedColor.y()),
+                gamma_correct(toneMappedColor.z())
         };
     }
 
 private:
     double white_point_;
 
-    [[nodiscard]] double tone_map(const double hit) const {
-        return hit * (1 + hit / (white_point_ * white_point_)) / (1.0 + hit);
+    [[nodiscard]] static double luminance(const Vec3 &v) {
+        return dot(v, Vec3(0.2126f, 0.7152f, 0.0722f));
+    }
+
+    static Vec3 changeLuminance(const Vec3 &cIn, const double &lOut) {
+        double l_in = luminance(cIn);
+        return cIn * (lOut / l_in);
+    }
+
+    [[nodiscard]] Vec3 extendedLuminance(const Vec3 &v) const {
+        double lOld = luminance(v);
+        double lNew = lOld * (1.0 + (lOld / (white_point_ * white_point_))) / (1.0 + lOld);
+        return changeLuminance(v, lNew);
+    }
+
+    [[nodiscard]] Vec3 reinhard_extended(const Vec3 &v) const {
+        const Vec3 numerator = v * (1.0f + (v / (white_point_ * white_point_)));
+        return numerator / (1.0f + v);
     }
 };
 

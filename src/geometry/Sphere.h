@@ -1,9 +1,8 @@
 #ifndef SPHERE_H
 #define SPHERE_H
 
-#include "color.h"
+#include <memory>
 #include "Hittable.h"
-#include "material.h"
 
 class Sphere : public Hittable {
 public:
@@ -14,33 +13,33 @@ public:
     }
 
 
-    bool intersect(const Ray &ray, double &t) const override {
+    bool intersect(Ray &ray) const override {
         const Vec3 oc = ray.origin - center;
         const double a = dot(ray.direction, ray.direction);
         const double b = 2 * dot(oc, ray.direction);
         const double c = dot(oc, oc) - pow(radius, 2);
 
         const double discriminant = b * b - 4 * a * c;
-        if (discriminant < 0) return false;
+        if (discriminant < 1e-10) return false;
 
         // Find the nearest intersection which is in acceptable range
         const double t1 = (-b - sqrt(discriminant)) / (2.0f * a);
         const double t2 = (-b + sqrt(discriminant)) / (2.0f * a);
 
-        if (t1 > 0.001f && t1 < t) {
-            t = t1;
+        if (t1 > 0.0001f && t1 < ray.t) {
+            ray.t = t1;
             return true;
         }
 
-        if (t2 > 0.001f && t2 < t) {
-            t = t2;
+        if (t2 > 0.0001f && t2 < ray.t) {
+            ray.t = t2;
             return true;
         }
 
         return false;
     }
 
-    [[nodiscard]] Vec3 calculateNormal(const point3 &hitPoint, const Ray &ray) const override {
+    [[nodiscard]] Vec3 calculateNormal(const point3 &hitPoint) const override {
         return unitVector(hitPoint - center);
     }
 
@@ -64,6 +63,38 @@ public:
         const Vec3 max = center + Vec3(radius, radius, radius);
 
         return {min, max};
+    }
+
+    [[nodiscard]] Vec3 getV0() const override {
+        return {0, 0, 0};
+    }
+
+    [[nodiscard]] Vec3 getV1() const override {
+        return {0, 0, 0};
+    }
+
+    [[nodiscard]] Vec3 getV2() const override {
+        return {0, 0, 0};
+    }
+
+    [[nodiscard]] Vec3 calculateBarycentricCoordinates(const Vec3 &p) const override {
+        return {0, 0, 0};
+    }
+
+    [[nodiscard]] double interpolateCoordinate1(const Vec3 &barycentric) const override {
+        return 0.0;
+    }
+
+    [[nodiscard]] double interpolateCoordinate2(const Vec3 &barycentric) const override {
+        return 0.0;
+    }
+
+    [[nodiscard]] double area() const override {
+        return 4.0 * M_PI * radius * radius;
+    }
+
+    [[nodiscard]] double volume() const override {
+        return (4.0 / 3.0) * M_PI * radius * radius * radius;
     }
 
 private:

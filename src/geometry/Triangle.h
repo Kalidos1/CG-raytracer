@@ -50,7 +50,7 @@ public:
         return true;
     }
 
-    [[nodiscard]] Vec3 calculateNormal(const point3 &hitPoint, const Ray &ray) const override {
+    [[nodiscard]] Vec3 calculateNormal(const point3 &hitPoint) const override {
         const Vec3 firstEdge = v1 - v0;
         const Vec3 secondEdge = v2 - v0;
         return unitVector(cross(firstEdge, secondEdge));
@@ -161,6 +161,7 @@ public:
 
 private:
     Vec3 v0, v1, v2;
+    Vec3 n1, n2, n3;
     double uv0[2], uv1[2], uv2[2];
 
     void applyTranslation(const Vec3 &translation) {

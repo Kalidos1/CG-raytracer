@@ -20,7 +20,7 @@ public:
 
     [[nodiscard]] virtual bool intersect(Ray &ray) const = 0;
 
-    [[nodiscard]] virtual Vec3 calculateNormal(const point3 &hitPoint, const Ray &ray) const = 0;
+    [[nodiscard]] virtual Vec3 calculateNormal(const point3 &hitPoint) const = 0;
 
     [[nodiscard]] virtual point3 calculateCenter() const = 0;
 

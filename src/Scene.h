@@ -6,6 +6,8 @@
 #include "acceleration/BspTrees.h"
 #include "acceleration/UniformGrid.h"
 #include "acceleration/BvhBuilder.h"
+#include "lighting/Light.h"
+#include "utils/Camera.h"
 
 class DataStructureFactory {
 public:
@@ -35,38 +37,45 @@ public:
     struct SceneConfig {
         int imageWidth;
         int imageHeight;
-        point3 camera;
-        Vec3 cameraDirection;
+        Camera camera;
         std::string objFilePath;
         std::string texturePath;
     };
 
     static SceneConfig createDefaultConfig() {
+        // 2.8
+        const point3 cameraPosition = Vec3(-1400, 350, -100);
+        const Vec3 cameraDirection = Vec3(1e-10 + 100, 1e-10 + -0.1, 1e-10 + -1);
+        const int imageWidth = 800;
+        const int imageHeight = 800;
+
+        Camera camera(cameraPosition,
+                      cameraDirection,
+                      57.5, // Best FOV (But synced now with camera and light rays)
+                      static_cast<double>(imageWidth) / imageHeight,
+                      imageWidth,
+                      imageHeight, 0.0, 1.0);
+
         return {
-                800,    // imageWidth
-                800,    // imageHeight
-                point3(0, 1, 2.8),  // camera
-                Vec3(1e-10, 1e-10, 1e-10 + -1),  // cameraDirection
-                "assets/obj_files/CornellBox-Original.obj",  // objFilePath
+                imageWidth,    // imageWidth
+                imageHeight,    // imageHeight
+                camera,
+                //"assets/obj_files/CornellBox-Original.obj",  // objFilePath
+                "assets/obj_files/exterior.obj",  // objFilePath
                 ""      // texturePath
         };
     }
 
-    [[nodiscard]] static std::vector<std::shared_ptr<Light>> setupLights() {
-        Color white(1, 1, 1);
-        Light light(white, point3(0, 1.95, 0), Vec3(0, 0, 0), 1.0);
-        return light.createPlaneLight();
+    static std::pair<std::vector<std::shared_ptr<Hittable>>, Light> setupObjects(const SceneConfig &config) {
+        auto meshData = ObjLoader::loadFromFile(config.objFilePath, config.texturePath, config.camera);
+        return {meshData.hittables, Light(meshData.lights)};
     }
 
-    [[nodiscard]] static std::vector<std::shared_ptr<Hittable>> setupObjects(const SceneConfig &config) {
-        auto meshData = ObjLoader::loadFromFile(config.objFilePath, config.texturePath);
-        return meshData.hittables;
-    }
 
     [[nodiscard]] static std::unique_ptr<DataStructure> setupAccelerationStructure(
             const std::vector<std::shared_ptr<Hittable>> &hittables,
-            DataStructureFactory::DataStructureType type = DataStructureFactory::DataStructureType::BVH, // Grid | BVH | BSP
-            Split splitType = Split::SAH, // Middle | SAH | Linear | LinearSAH
+            DataStructureFactory::DataStructureType type = DataStructureFactory::DataStructureType::Grid, // Grid | BVH | BSP
+            Split splitType = Split::Middle, // Middle | SAH | Linear | LinearSAH
             GridType gridType = GridType::Compact, // Compact | Hashed
             TreeType treeType = TreeType::KD // KD | Octree
     ) {
@@ -75,13 +84,25 @@ public:
         return structure;
     }
 
-//    static void transformObjects(std::vector<std::shared_ptr<Hittable>> &objects,
-//                                 const Vec3 &translation = Vec3(0, 0, 0),
-//                                 const Vec3 &rotation = Vec3(0, 1, 0),
-//                                 float scale = 1.0f)        { for (const auto& object : objects) {
-//            object->applyModelTransform(translation, rotation, Vec3(0, 0, 0), scale,
-//                                        object->calculateCenter());
-//        }
+    static void transformObjects(std::vector<std::shared_ptr<Hittable>> &objects,
+                                 const Vec3 &translation = Vec3(0, 0, 0),
+                                 const Vec3 &rotation = Vec3(0, 1, 0),
+                                 float scale = 45.0f) {
+        for (const auto &object: objects) {
+            object->applyModelTransform(translation, rotation, Vec3(0, 0, 0), scale,
+                                        object->calculateCenter());
+        }
+    }
+
+    static void transformView(std::vector<std::shared_ptr<Hittable>> &objects,
+                              const Vec3 &translation = Vec3(0, 0, 0),
+                              const Vec3 &rotation = Vec3(0, 0, 1),
+                              float scale = 20.0f) {
+        for (const auto &object: objects) {
+            object->applyViewTransform(translation, rotation, scale,
+                                       point3(0, 1, 2.8));
+        }
+    }
 };
 
 #endif //RAYTRACER_SCENE_H

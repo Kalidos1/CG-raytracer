@@ -14,4 +14,11 @@ inline void writeColor(std::ostream &out, const Color &pixelColor) {
         << static_cast<int>(255.999 * pixelColor.z()) << '\n';
 }
 
+inline bool hasEmission(const Color &color) {
+    // Check if any component is significantly above zero
+    // Using a small threshold to handle floating-point precision
+    const double threshold = 1e-4;
+    return color.x() > threshold || color.y() > threshold || color.z() > threshold;
+}
+
 #endif //RAYTRACER_COLOR_H
